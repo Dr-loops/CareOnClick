@@ -1,0 +1,62 @@
+[
+  {
+    "name": "SAMUEL YEBOAH",
+    "email": "samuelyeboah@gmail.com",
+    "id": "pat7957",
+    "source": "users"
+  },
+  {
+    "name": "Ethel Stargirl",
+    "email": "etheladabs@gmail.com",
+    "id": "pat4139",
+    "source": "users"
+  },
+  {
+    "name": "Patricia Mawulolo Kaletsi ",
+    "email": "elevatedpretty@gmail.com",
+    "id": "pat5414",
+    "source": "users"
+  },
+  {
+    "name": "Stem Cell",
+    "email": "stemcell070@gmail.com",
+    "id": "pat2922",
+    "source": "users"
+  },
+  {
+    "name": "Asana imoro",
+    "email": "asanaimoro@gmail.com",
+    "id": "pat7638",
+    "source": "users"
+  },
+  {
+    "name": "John Doe",
+    "email": "patient@drkal.com",
+    "id": "pat1",
+    "source": "users"
+  },
+  {
+    "name": "John Doe Alex",
+    "id": "PATH-1234",
+    "email": "johndoealex@gmail.com",
+    "source": "appointments"
+  },
+  {
+    "name": "Ethel Stargirl",
+    "id": "PATH-8406",
+    "email": "ethelstargirl@gmail.com",
+    "source": "appointments"
+  },
+  {
+    "name": "Asana imoro",
+    "id": "PATH-7628",
+    "email": "asanaimoro@gmail.com",
+    "source": "appointments"
+  },
+  {
+    "name": "Patricia Mawulolo Kaletsi ",
+    "id": "PATH-4016",
+    "email": "patriciamawulolokaletsi@gmail.com",
+    "source": "appointments"
+  }
+]
