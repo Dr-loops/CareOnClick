@@ -1,0 +1,1750 @@
+﻿
+> dr-kals-virtual-hospital@0.1.0 lint
+> next lint
+
+node.exe : `next 
+lint` is deprecated 
+and will be removed 
+in Next.js 16.
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (`next l   
+ int` is ... in N    
+ext.js 16.:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+For new projects, 
+use create-next-app 
+to choose your 
+preferred linter.
+For existing 
+projects, migrate to 
+the ESLint CLI:
+npx 
+@next/codemod@canary 
+next-lint-to-eslint-c
+li .
+
+
+./app/api/patients/ro
+ute.js
+85:21  Error: 'appoin
+tmentsAsPatient' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+
+./app/consultation/[i
+d]/page.js
+2:17  Error: 
+'useEffect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+2:28  Error: 
+'useState' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./app/login/page.js
+57:27  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./app/services/page.j
+s
+90:34  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+90:82  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./app/verify-email/pa
+ge.js
+5:10  Error: 
+'getGlobalData' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+5:25  Error: 'KEYS' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:11  Error: 
+'router' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+11:11  Error: 'type' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+36:23  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./components/AdBanner
+.js
+3:8  Error: 'Link' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+160:13  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/AdminDas
+hboard.js
+4:10  Error: 
+'getGlobalData' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:25  Error: 'KEYS' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:31  Error: 
+'updateConfig' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:45  Error: 
+'getConfig' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:56  Error: 
+'addNotification' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:93  Error: 
+'deleteAppointment' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:112  Error: 
+'logAudit' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+5:10  Error: 
+'useAuth' is defined 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+7:10  Error: 
+'triggerWorkflow' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+10:10  Error: 
+'mapToFHIRPatient' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+11:10  Error: 
+'analyzeResult' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+20:12  Error: 
+'selectedPatient' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+20:29  Error: 
+'setSelectedPatient' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+21:12  Error: 
+'previewFile' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+21:25  Error: 
+'setPreviewFile' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+25:12  Error: 
+'loadingUsers' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+38:12  Error: 
+'siteConfig' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+43:12  Error: 
+'loadingRecords' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+43:28  Error: 
+'setLoadingRecords' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+163:18  Error: 'e' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+1053:68  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+1266:50  Error: 'e' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+1379:46  Error: 
+'err' is defined but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+1513:113  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+1587:58  Error: 'e' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/Calendar
+View.js
+8:60  Error: 
+'userRole' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/Collabor
+ationTab.js
+159:21  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/Communic
+ationHub.js
+5:8  Error: 'Input' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+7:8  Error: 
+'WhatsAppButton' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+16:5  Error: 
+'onPatientSelect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+80:8  Warning: React 
+Hook useEffect has a 
+missing dependency: 
+'fetchMessages'. 
+Either include it or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+
+./components/Dictatio
+nRecorder.tsx
+1:27  Error: 
+'useEffect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+10:53  Error: 
+'placeholder' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+10:95  Error: 
+'label' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/Dieticia
+nDashboard.js
+2:20  Error: 
+'useEffect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+6:26  Error: 
+'CLINICAL_ALERTS' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:8  Error: 'PatientA
+utofillInputs' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+92:12  Error: 'select
+edPatientName' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+92:33  Error: 'setSel
+ectedPatientName' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+95:12  Error: 
+'toast' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+95:19  Error: 
+'setToast' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+96:12  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+96:22  Error: 
+'setMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+97:12  Error: 
+'loadingMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+97:29  Error: 
+'setLoadingMessages' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+322:104  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+322:116  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+340:133  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./components/EmailCom
+poserModal.js
+42:18  Error: 'err' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/Engageme
+ntTab.js
+19:8  Warning: React 
+Hook useEffect has a 
+missing dependency: 
+'fetchMessages'. 
+Either include it or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+
+./components/ErrorBou
+ndary.js
+40:76  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./components/Navbar.j
+s
+22:21  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+23:33  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./components/NewsFeed
+.js
+62:25  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/NurseDas
+hboard.js
+3:28  Error: 'updateP
+atientVitals' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+3:49  Error: 
+'sendGlobalMessage' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:10  Error: 
+'analyzeResult' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:25  Error: 
+'analyzeBP' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:26  Error: 
+'CLINICAL_ALERTS' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+15:8  Error: 'Patient
+AutofillInputs' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+143:12  Error: 'selec
+tedPatientName' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+143:33  Error: 'setSe
+lectedPatientName' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+146:25  Error: 
+'setVitalsInput' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+176:12  Error: 
+'chatMessage' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+176:25  Error: 
+'setChatMessage' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+181:12  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+182:12  Error: 
+'loadingMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+186:11  Error: 
+'globalVitals' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+237:8  Warning: 
+React Hook useEffect 
+has a missing 
+dependency: 
+'fetchMessages'. 
+Either include it or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+714:86  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+714:119  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+
+./components/PatientD
+ashboard.js
+5:8  Error: 
+'WhatsAppButton' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+30:12  Error: 
+'paymentMode' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+30:25  Error: 
+'setPaymentMode' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+38:33  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+58:12  Error: 'loadin
+gAppointments' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+250:8  Warning: 
+React Hook useEffect 
+has a missing 
+dependency: 
+'fetchProfile'. 
+Either include it or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+385:17  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+386:49  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+627:73  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+665:49  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+691:70  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+692:59  Error: 
+'allApps' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+1493:42  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+1623:112  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+1707:107  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+1790:49  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+1898:45  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/PatientR
+ecordFinder.js
+235:41  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/Paystack
+Button.js
+54:17  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/Pharmacy
+Dashboard.js
+4:41  Error: 
+'CLINICAL_ALERTS' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+5:31  Error: 
+'dispatchSync' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:8  Error: 
+'CollaborationTab' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+132:5  Error: React 
+Hook "useGlobalSync" 
+is called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+133:39  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+134:43  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+135:55  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+136:43  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+137:45  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+138:12  Error: 
+'toast' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+138:19  Error: 
+'setToast' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+138:31  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+139:12  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+139:22  Error: 
+'setMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+139:37  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+140:12  Error: 
+'loadingMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+140:29  Error: 
+'setLoadingMessages' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+140:51  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+141:47  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+142:51  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+143:41  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+144:55  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+145:45  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+148:45  Error: React 
+Hook "usePatients" 
+is called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render. 
+Did you accidentally 
+call a React Hook 
+after an early 
+return?  react-hooks/
+rules-of-hooks
+163:39  Error: React 
+Hook "useState" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render. 
+Did you accidentally 
+call a React Hook 
+after an early 
+return?  react-hooks/
+rules-of-hooks
+165:5  Error: React 
+Hook "useEffect" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render. 
+Did you accidentally 
+call a React Hook 
+after an early 
+return?  react-hooks/
+rules-of-hooks
+187:5  Error: React 
+Hook "useEffect" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render. 
+Did you accidentally 
+call a React Hook 
+after an early 
+return?  react-hooks/
+rules-of-hooks
+194:11  Error: 'updat
+ePrescriptionStatus' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+221:15  Error: 
+'newRx' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+783:66  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+783:95  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+917:51  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+917:74  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+
+./components/Professi
+onalDashboard.js
+4:8  Error: 'Link' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+8:5  Error: 
+'Calendar' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+8:15  Error: 'Users' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+8:22  Error: 
+'Activity' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+8:32  Error: 
+'FileText' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+8:42  Error: 
+'MessageSquare' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:5  Error: 'Video' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:12  Error: 
+'Settings' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:22  Error: 'Bell' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:28  Error: 
+'Search' is defined 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+9:36  Error: 'Mic' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:41  Error: 'Plus' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+16:28  Error: 
+'updateAppointment' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+16:62  Error: 
+'performTriage' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+16:77  Error: 'update
+PatientVitals' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+19:23  Error: 
+'useVitals' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+19:34  Error: 
+'useTasks' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+40:8  Error: 
+'VideoConsultation' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+148:12  Error: 'showV
+ideoConsultation' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+148:35  Error: 'setSh
+owVideoConsultation' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+204:12  Error: 
+'isRecording' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+204:25  Error: 
+'setIsRecording' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+205:12  Error: 
+'dictatedNote' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+205:26  Error: 
+'setDictatedNote' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+235:12  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+236:12  Error: 
+'loadingMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+259:47  Error: 
+'loadingPatients' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+307:8  Warning: 
+React Hook useEffect 
+has missing 
+dependencies: 'fetchP
+atientRecords' and 
+'selectedPatient'. 
+Either include them 
+or remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+392:5  Error: React 
+Hook "useEffect" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render. 
+Did you accidentally 
+call a React Hook 
+after an early 
+return?  react-hooks/
+rules-of-hooks
+396:8  Warning: 
+React Hook useEffect 
+has a missing 
+dependency: 
+'fetchMessages'. 
+Either include it or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+469:59  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+597:17  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+598:49  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+679:78  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+936:86  Error: 'e' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+1091:62  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+1275:98  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+1275:108  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+1275:203  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+1731:128  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+1731:143  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+1746:55  Error: 
+'todayStr' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+1760:62  Error: 'e' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+1771:59  Error: 
+'hasRecord' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+1805:73  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+1881:136  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+1881:151  Error: `"` 
+can be escaped with 
+`&quot;`, `&ldquo;`, 
+`&#34;`, `&rdquo;`.  
+react/no-unescaped-en
+tities
+
+./components/ProfileM
+odal.js
+121:33  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/Psycholo
+gistDashboard.js
+2:20  Error: 
+'useEffect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+6:26  Error: 
+'CLINICAL_ALERTS' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+9:8  Error: 'PatientA
+utofillInputs' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+92:12  Error: 'select
+edPatientName' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+92:33  Error: 'setSel
+ectedPatientName' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+95:12  Error: 
+'toast' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+95:19  Error: 
+'setToast' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+96:12  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+96:22  Error: 
+'setMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+97:12  Error: 
+'loadingMessages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+97:29  Error: 
+'setLoadingMessages' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+188:62  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+
+./components/Sidebar.
+tsx
+16:35  Error: 'role' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+31:28  Error: `'` 
+can be escaped with 
+`&apos;`, `&lsquo;`, 
+`&#39;`, `&rsquo;`.  
+react/no-unescaped-en
+tities
+
+./components/Toast.js
+2:17  Error: 
+'useState' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/TopBar.t
+sx
+38:25  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./components/ui/Butto
+n.tsx
+8:57  Error: 'size' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+
+./components/ui/Patie
+ntAutofillInputs.js
+1:17  Error: 
+'useState' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+1:27  Error: 
+'useEffect' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./components/VideoCon
+sultation.js
+5:10  Error: 'ROLES' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+7:8  Error: 'Card' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+80:8  Warning: React 
+Hook useEffect has 
+missing 
+dependencies: 'create
+PeerConnection' and 
+'stream'. Either 
+include them or 
+remove the 
+dependency array.  re
+act-hooks/exhaustive-
+deps
+
+./components/VitalsMo
+nitor.tsx
+4:53  Error: 'YAxis' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+6:1  Error: Use 
+"@ts-expect-error" 
+instead of 
+"@ts-ignore", as 
+"@ts-ignore" will do 
+nothing if the 
+following line is 
+error-free.  @typescr
+ipt-eslint/ban-ts-com
+ment
+31:43  Error: 
+'isLoading' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+31:57  Error: React 
+Hook "useVitals" is 
+called 
+conditionally. React 
+Hooks must be called 
+in the exact same 
+order in every 
+component render.  re
+act-hooks/rules-of-ho
+oks
+44:48  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+49:23  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+
+./components/WhatsApp
+Button.js
+23:13  Warning: 
+Using `<img>` could 
+result in slower LCP 
+and higher 
+bandwidth. Consider 
+using `<Image />` 
+from `next/image` or 
+a custom image 
+loader to 
+automatically 
+optimize images. 
+This may incur 
+additional usage or 
+cost from your 
+provider. See: https:
+//nextjs.org/docs/mes
+sages/no-img-element 
+ @next/next/no-img-el
+ement
+
+./lib/ai_logic.ts
+19:9  Error: 
+'reasons' is never 
+reassigned. Use 
+'const' instead.  
+prefer-const
+
+./lib/crypto.js
+54:14  Error: 'e' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./lib/global_sync.js
+3:10  Error: 
+'getSocket' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+428:15  Error: 
+'oldApp' is assigned 
+a value but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./lib/hooks/useClinic
+alData.ts
+9:20  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+24:20  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+32:20  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+45:71  Error: 
+Unexpected any. 
+Specify a different 
+type.  @typescript-es
+lint/no-explicit-any
+
+./lib/hooks/useGlobal
+Sync.js
+38:22  Error: 'e' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./lib/imap_client.js
+1:14  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+2:26  Error: A 
+`require()` style 
+import is forbidden. 
+ @typescript-eslint/n
+o-require-imports
+4:16  Error: 
+'fetchEmails' is 
+defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+4:28  Error: 'limit' 
+is assigned a value 
+but never used.  @typ
+escript-eslint/no-unu
+sed-vars
+35:15  Error: 
+'messages' is 
+assigned a value but 
+never used.  @typescr
+ipt-eslint/no-unused-
+vars
+186:26  Error: 'err' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+./lib/notifications/i
+ndex.js
+23:41  Error: 'text' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+23:47  Error: 'html' 
+is defined but never 
+used.  @typescript-es
+lint/no-unused-vars
+
+info  - Need to 
+disable some ESLint 
+rules? Learn more 
+here: https://nextjs.
+org/docs/app/api-refe
+rence/config/eslint#d
+isabling-rules

@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "Next.js: Firefox",
+            "type": "firefox",
+            "request": "launch",
+            "reAttach": true,
+            "url": "http://localhost:3000",
+            "pathMappings": [
+                {
+                    "url": "webpack:///./",
+                    "path": "${workspaceFolder}/"
+                }
+            ]
+        }
+    ]
+}
