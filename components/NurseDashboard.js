@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { saveGlobalRecord, updatePatientVitals, sendGlobalMessage, getGlobalData, KEYS, updateNotificationStatus, updateAppointment } from '@/lib/global_sync';
 import { analyzeResult, analyzeBP } from '@/lib/medical_analysis';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
+import { useSWRConfig } from 'swr'; // [FIX] Import SWR Config
 import PatientRecordFinder from './PatientRecordFinder';
 
 import CollaborationTab from './CollaborationTab';
@@ -133,11 +134,10 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
     );
 };
 
-// Mocks removed
-
 
 export default function NurseDashboard({ user }) {
     useGlobalSync();
+    const { mutate } = useSWRConfig(); // [FIX] Get mutate function
     const [activeTab, setActiveTab] = useState('patients');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPatientId, setSelectedPatientId] = useState(null);
@@ -147,6 +147,11 @@ export default function NurseDashboard({ user }) {
     const [vitalsInput, setVitalsInput] = useState({
         hr: '', bp: '', spo2: '', temp: '', rr: '', weight: '', glucose: ''
     });
+
+    const handleVitalChange = (e) => {
+        const { name, value } = e.target;
+        setVitalsInput(prev => ({ ...prev, [name]: value }));
+    };
 
     // Fetch Real Data
     const { patients, isLoading: isLoadingPatients } = usePatients(searchQuery);
@@ -321,6 +326,30 @@ export default function NurseDashboard({ user }) {
             }
         });
         alert('Nursing note has been filed globally.');
+    };
+
+    // [FIX] Added missing getAnalysis helper
+    const getAnalysis = (fieldName, value) => {
+        if (!value) return null;
+        // Safely handle missing selectedPatient
+        const sp = selectedPatient || {};
+        const age = sp.age && sp.age !== 'N/A' ? parseInt(sp.age) : 30;
+        const sex = sp.gender || 'Male';
+
+        if (fieldName === 'bp') return analyzeBP(value, age);
+
+        const map = {
+            'hr': { cat: 'VITALS', test: 'HR' },
+            'spo2': { cat: 'VITALS', test: 'SpO2' },
+            'temp': { cat: 'VITALS', test: 'Temp' },
+            'rr': { cat: 'VITALS', test: 'RR' },
+            'glucose': { cat: 'VITALS', test: 'Glucose' },
+        };
+
+        const def = map[fieldName];
+        if (!def) return null;
+
+        return analyzeResult(def.cat, def.test, value, age, sex);
     };
 
     // Helper functions removed (renderVitalsCard)
@@ -582,6 +611,12 @@ export default function NurseDashboard({ user }) {
 
                                         if (res.ok) {
                                             alert('Vitals recorded successfully!');
+                                            // [FIX] Immediate Refresh
+                                            // Mutate vitals for this patient to update EKG/Charts
+                                            mutate(`/api/vitals?patientId=${selectedPatientId}`);
+                                            // Mutate patient list to update "Latest Vital" column
+                                            mutate((key) => typeof key === 'string' && key.startsWith('/api/patients'));
+
                                             // Keep form data per user request
                                             // setVitalsInput({ hr: '', bp: '', spo2: '', temp: '', rr: '', weight: '', glucose: '' }); 
                                             // Ideally refresh vitals view here
