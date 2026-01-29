@@ -1,0 +1,6 @@
+{
+  "/api/db/route": "app/api/db/route.js",
+  "/api/vitals/route": "app/api/vitals/route.js",
+  "/login/page": "app/login/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
+}

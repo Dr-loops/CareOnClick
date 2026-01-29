@@ -1,0 +1,18 @@
+﻿C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:3:28: 'updatePatientVitals' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:3:49: 'sendGlobalMessage' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:7:10: 'useRouter' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:11:26: 'CLINICAL_ALERTS' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:18:8: 'PatientAutofillInputs' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:152:12: 'selectedPatientName' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:152:33: 'setSelectedPatientName' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:206:12: 'chatMessage' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:206:25: 'setChatMessage' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:211:12: 'messages' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:212:12: 'loadingMessages' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:268:11: 'globalVitals' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:319:8: React Hook useEffect has a missing dependency: 'fetchMessages'. Either include it or remove the dependency array. [Warning/react-hooks/exhaustive-deps]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:434:29: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element [Warning/@next/next/no-img-element]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:978:90: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. [Error/react/no-unescaped-entities]
+C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\components\NurseDashboard.js:978:104: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. [Error/react/no-unescaped-entities]
+
+16 problems
