@@ -66,6 +66,11 @@ export default function PatientDashboard({ user }) {
     const [replyContent, setReplyContent] = useState('');
     const [isSendingReply, setIsSendingReply] = useState(false);
 
+    // Profile & Security State
+    const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [profileStatus, setProfileStatus] = useState({ type: '', message: '' });
+
     // Fetch Appointments from API
     const fetchAppointments = async () => {
         setLoadingAppointments(true);
@@ -221,6 +226,7 @@ export default function PatientDashboard({ user }) {
                         phone: serverUser?.phoneNumber || serverProfile?.phoneNumber || user.phone,
                         region: serverUser?.region || serverProfile?.region || user.region,
                         country: serverUser?.country || user.country || 'Ghana',
+                        avatarUrl: serverUser?.avatarUrl || user.avatarUrl,
 
                         // Map Profile Specifics
                         dob: serverProfile?.dateOfBirth,
@@ -245,6 +251,50 @@ export default function PatientDashboard({ user }) {
             }
         } catch (e) {
             console.error("Failed to fetch profile", e);
+        }
+    };
+
+    const handleUpdateProfile = async (e) => {
+        if (e) e.preventDefault();
+        setProfileLoading(true);
+        setProfileStatus({ type: '', message: '' });
+
+        try {
+            // 1. Update User Table (Name, Avatar, Phone, Password if any)
+            const userPayload = {
+                name: profile.fullName || profile.name,
+                phoneNumber: profile.phone || profile.phoneNumber,
+                whatsappNumber: profile.whatsappNumber,
+                region: profile.region,
+                country: profile.country,
+                avatarUrl: profile.avatarUrl,
+            };
+
+            if (passwords.new) {
+                if (passwords.new !== passwords.confirm) {
+                    throw new Error("New passwords do not match");
+                }
+                userPayload.password = passwords.new;
+            }
+
+            const userRes = await fetch('/api/user/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(userPayload)
+            });
+
+            if (!userRes.ok) throw new Error("Failed to update user identity");
+
+            // 2. Update Patient Profile Table (Address, DOB, etc.)
+            savePatientProfile(patientId, profile);
+
+            setProfileStatus({ type: 'success', message: 'Profile updated successfully!' });
+            setPasswords({ current: '', new: '', confirm: '' });
+            fetchProfile(); // Refresh
+        } catch (err) {
+            setProfileStatus({ type: 'error', message: err.message });
+        } finally {
+            setProfileLoading(false);
         }
     };
 
@@ -397,10 +447,24 @@ export default function PatientDashboard({ user }) {
             {/* Sidebar */}
             <aside className="card" style={{ height: 'fit-content', padding: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ width: '80px', height: '80px', background: 'var(--color-cyan-sand)', borderRadius: '50%', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                        <img src="/logo_new.jpg" alt="Logo" style={{ width: '40px', height: '40px' }} />
+                    <div
+                        onClick={() => setActiveTab('settings')}
+                        style={{
+                            width: '90px', height: '90px', background: 'var(--color-cyan-sand)', borderRadius: '50%',
+                            margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '2rem', cursor: 'pointer', border: activeTab === 'settings' ? '3px solid var(--color-navy)' : '2px solid transparent',
+                            transition: 'all 0.2s', overflow: 'hidden', position: 'relative'
+                        }}
+                        title="Click to edit profile"
+                    >
+                        {profile.avatarUrl ? (
+                            <img src={profile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '50px', height: '50px' }} />
+                        )}
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '10px', padding: '2px 0', opacity: 0.8 }}>EDIT</div>
                     </div>
-                    <h3>{displayName}</h3>
+                    <h3 style={{ cursor: 'pointer' }} onClick={() => setActiveTab('settings')}>{displayName}</h3>
                     <p style={{ color: 'var(--text-secondary)' }}>Patient ID: {displayId}</p>
                 </div>
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -414,6 +478,7 @@ export default function PatientDashboard({ user }) {
                     <button onClick={() => setActiveTab('alerts')} className={`btn ${activeTab === 'alerts' ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', justifyContent: 'flex-start', color: messages.some(m => m.type === 'ALERT') ? 'red' : 'inherit' }}>
                         Alerts & Messages {messages.some(m => m.type === 'ALERT') && '⚠️'}
                     </button>
+                    <button onClick={() => setActiveTab('settings')} className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', justifyContent: 'flex-start' }}>⚙️ Profile Settings</button>
                 </nav>
             </aside>
 
@@ -422,130 +487,191 @@ export default function PatientDashboard({ user }) {
                 {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
                 {activeTab === 'overview' && (
                     <div className="card">
-                        <h2 style={{ color: 'var(--color-navy)', marginBottom: '1.5rem' }}>Personal Information</h2>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            savePatientProfile(patientId, profile);
-                            setToast({ message: 'Profile updated successfully!', type: 'success' });
-                        }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ color: 'var(--color-navy)', margin: 0 }}>Personal Information</h2>
+                            <button onClick={() => setActiveTab('settings')} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>Edit Details & Password</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Full Name</label>
-                                <input
-                                    type="text"
-                                    name="fullName"
-                                    value={profile.fullName || user.name || ''}
-                                    onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Full Name</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.fullName || user.name}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Sex</label>
-                                <select
-                                    name="sex"
-                                    className="input"
-                                    value={profile.sex || profile.gender || ""}
-                                    onChange={(e) => setProfile({ ...profile, sex: e.target.value, gender: e.target.value })}
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                >
-                                    <option value="">Select Sex</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Sex</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.sex || profile.gender || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Age</label>
-                                <input
-                                    type="number"
-                                    name="age"
-                                    value={profile.age || ""}
-                                    onChange={(e) => setProfile({ ...profile, age: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Age</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.age || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Phone Number</label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={profile.phone || profile.phoneNumber || ""}
-                                    onChange={(e) => setProfile({ ...profile, phone: e.target.value, phoneNumber: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Phone Number</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.phone || profile.phoneNumber || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: 'span 2' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Email Address</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={profile.email || user.email || ''}
-                                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Email Address</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.email || user.email}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: 'span 2' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Residential Address</label>
-                                <textarea
-                                    name="address"
-                                    value={profile.address || ""}
-                                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd', minHeight: '80px' }}
-                                ></textarea>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Residential Address</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', minHeight: '60px' }}>{profile.address || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Region (Ghana)</label>
-                                <select
-                                    name="region"
-                                    value={profile.region || ""}
-                                    onChange={(e) => setProfile({ ...profile, region: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Region (Ghana)</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.region || 'Not Set'}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Country</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.country || 'Ghana'}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div className="card">
+                        <h2 style={{ color: 'var(--color-navy)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            ⚙️ Profile & Security Settings
+                        </h2>
+
+                        {profileStatus.message && (
+                            <div style={{
+                                padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px',
+                                background: profileStatus.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                                color: profileStatus.type === 'success' ? '#16a34a' : '#dc2626',
+                                border: `1px solid ${profileStatus.type === 'success' ? '#bbf7d0' : '#fecaca'}`
+                            }}>
+                                {profileStatus.message}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleUpdateProfile}>
+                            {/* Profile Picture Section */}
+                            <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                    <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                                        {profile.avatarUrl ? (
+                                            <img src={profile.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>No Image</div>
+                                        )}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Avatar URL</label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            placeholder="Paste image URL here"
+                                            value={profile.avatarUrl || ''}
+                                            onChange={(e) => setProfile({ ...profile, avatarUrl: e.target.value })}
+                                            style={{ padding: '0.8rem' }}
+                                        />
+                                        <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.4rem' }}>For a premium look, use a professional headshot URL.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Personal Details Section */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={profile.fullName || profile.name || ''}
+                                        onChange={(e) => setProfile({ ...profile, fullName: e.target.value, name: e.target.value })}
+                                        className="input"
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Sex</label>
+                                    <select
+                                        className="input"
+                                        value={profile.sex || profile.gender || ""}
+                                        onChange={(e) => setProfile({ ...profile, sex: e.target.value, gender: e.target.value })}
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    >
+                                        <option value="">Select Sex</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={profile.phone || profile.phoneNumber || ""}
+                                        onChange={(e) => setProfile({ ...profile, phone: e.target.value, phoneNumber: e.target.value })}
+                                        className="input"
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        value={profile.dob ? new Date(profile.dob).toISOString().split('T')[0] : ""}
+                                        onChange={(e) => setProfile({ ...profile, dob: e.target.value, dateOfBirth: e.target.value })}
+                                        className="input"
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Residential Address</label>
+                                    <textarea
+                                        value={profile.address || ""}
+                                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                                        className="input"
+                                        style={{ padding: '0.8rem', minHeight: '60px' }}
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            {/* Security Section */}
+                            <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '2rem' }}>
+                                <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#1e293b' }}>🔐 Security Settings</h3>
+                                <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>Leave blank if you don't want to change your password.</p>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>New Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Min 6 characters"
+                                            value={passwords.new}
+                                            onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                                            className="input"
+                                            style={{ padding: '0.8rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Confirm New Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Repeat new password"
+                                            value={passwords.confirm}
+                                            onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                                            className="input"
+                                            style={{ padding: '0.8rem' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '2.5rem' }}>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem' }}
+                                    disabled={profileLoading}
                                 >
-                                    <option value="">Select Region</option>
-                                    <option value="Ahafo">Ahafo</option>
-                                    <option value="Ashanti">Ashanti</option>
-                                    <option value="Bono">Bono</option>
-                                    <option value="Bono East">Bono East</option>
-                                    <option value="Central">Central</option>
-                                    <option value="Eastern">Eastern</option>
-                                    <option value="Greater Accra">Greater Accra</option>
-                                    <option value="North East">North East</option>
-                                    <option value="Northern">Northern</option>
-                                    <option value="Oti">Oti</option>
-                                    <option value="Savannah">Savannah</option>
-                                    <option value="Upper East">Upper East</option>
-                                    <option value="Upper West">Upper West</option>
-                                    <option value="Volta">Volta</option>
-                                    <option value="Western">Western</option>
-                                    <option value="Western North">Western North</option>
-                                </select>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Current Country</label>
-                                <input
-                                    type="text"
-                                    name="country"
-                                    value={profile.country || "Ghana"}
-                                    onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
-                            </div>
-                            <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
-                                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem' }}>Save & Update Profile</button>
+                                    {profileLoading ? '⌛ Saving Changes...' : '💾 Save & Update All Information'}
+                                </button>
                             </div>
                         </form>
                     </div>
