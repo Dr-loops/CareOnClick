@@ -1,0 +1,16 @@
+name: Neon Database Branching
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  manage-neon-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or Update Neon Branch
+        uses: neondatabase/create-branch-action@v5
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          # The branch name defaults to preview/pr-${{ github.event.number }}
+          # The action also handles branch deletion when the PR is closed

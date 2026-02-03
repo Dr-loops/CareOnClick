@@ -56,6 +56,11 @@ export default function AdminDashboard({ user }) {
     const [financeSearch, setFinanceSearch] = useState('');
     const [addingFinance, setAddingFinance] = useState(null); // { patientId, name } for Add Modal
 
+    // Security State
+    const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [passLoading, setPassLoading] = useState(false);
+    const [passStatus, setPassStatus] = useState({ type: '', message: '' });
+
     // Hooks
     useEffect(() => {
         fetchUsers();
@@ -534,6 +539,7 @@ export default function AdminDashboard({ user }) {
                         <TabButton id="communication" label="Communication" icon="💬" />
                         <TabButton id="mailbox" label="Inbox" icon="📥" />
                         <TabButton id="site-editor" label="Site" icon="⚙️" />
+                        <TabButton id="security" label="Security" icon="🔒" />
                     </div>
                 </div>
             </header>
@@ -2211,6 +2217,135 @@ export default function AdminDashboard({ user }) {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* SECURITY TAB */}
+                {activeTab === 'security' && (
+                    <div className="animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                        <div style={cardStyle}>
+                            <div style={{ marginBottom: '32px' }}>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: colors.text, marginBottom: '8px' }}>Security & Account</h2>
+                                <p style={{ color: colors.textLight }}>Manage your login credentials and account security.</p>
+                            </div>
+
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (passwords.new !== passwords.confirm) {
+                                    setPassStatus({ type: 'error', message: 'New passwords do not match' });
+                                    return;
+                                }
+                                if (passwords.new.length < 6) {
+                                    setPassStatus({ type: 'error', message: 'Password must be at least 6 characters' });
+                                    return;
+                                }
+
+                                setPassLoading(true);
+                                setPassStatus({ type: '', message: '' });
+
+                                try {
+                                    const res = await fetch('/api/user/change-password', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            currentPassword: passwords.current,
+                                            newPassword: passwords.new
+                                        })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        setPassStatus({ type: 'success', message: 'Password updated successfully!' });
+                                        setPasswords({ current: '', new: '', confirm: '' });
+                                    } else {
+                                        setPassStatus({ type: 'error', message: data.error || 'Failed to update password' });
+                                    }
+                                } catch (err) {
+                                    setPassStatus({ type: 'error', message: 'Network error. Please try again.' });
+                                } finally {
+                                    setPassLoading(false);
+                                }
+                            }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>Current Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.current}
+                                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.new}
+                                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '32px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.confirm}
+                                        onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                {passStatus.message && (
+                                    <div style={{
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        marginBottom: '24px',
+                                        background: passStatus.type === 'success' ? '#dcfce7' : '#fee2e2',
+                                        color: passStatus.type === 'success' ? '#166534' : '#991b1b',
+                                        fontWeight: 'bold',
+                                        textAlign: 'center'
+                                    }}>
+                                        {passStatus.type === 'success' ? '✅ ' : '❌ '}
+                                        {passStatus.message}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={passLoading}
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: colors.primary,
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '1rem',
+                                        cursor: passLoading ? 'not-allowed' : 'pointer',
+                                        opacity: passLoading ? 0.7 : 1,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {passLoading ? 'Updating...' : 'Update Password'}
+                                </button>
+                            </form>
+                        </div>
+
+                        <div style={{ ...cardStyle, marginTop: '24px', background: '#fffbeb', border: '1px solid #fde68a' }}>
+                            <h4 style={{ margin: '0 0 12px 0', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>⚠️</span> Security Tip
+                            </h4>
+                            <p style={{ margin: 0, color: '#92400e', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                                Encryption keys and system secrets are managed via environment variables. Changing your UI password only updates your login credentials.
+                            </p>
+                        </div>
                     </div>
                 )}
             </main>
