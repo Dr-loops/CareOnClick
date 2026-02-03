@@ -9,8 +9,7 @@ export default function Home() {
             <section className="hero-section">
                 <div className="hero-content">
                     <h1 className="hero-title">
-                        Dr. Kal&apos;s <br />
-                        <span className="text-secondary-grad">Virtual Hospital</span>
+                        CareOnClick
                     </h1>
                     <p className="hero-subtitle">
                         Connect with top-tier medical professionals from the comfort of your home. Secure, efficient, and patient-centered care for everyone.

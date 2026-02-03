@@ -84,9 +84,9 @@ export default function BillingInvoiceModal({ isOpen, onClose, patient, professi
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '3px solid #1e3a8a', paddingBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <img src="/logo.png" alt="Hospital Logo" style={{ height: '60px', width: 'auto' }} />
+                        <img src="/logo_new.jpg" alt="Hospital Logo" style={{ height: '60px', width: 'auto' }} />
                         <div>
-                            <h1 style={{ margin: 0, color: '#1e3a8a', fontSize: '1.8rem' }}>DR KAL&apos;S VIRTUAL HOSPITAL</h1>
+                            <h1 style={{ margin: 0, color: '#1e3a8a', fontSize: '1.8rem' }}>CAREONCLICK</h1>
                             <p style={{ margin: '5px 0 0', color: '#64748b' }}>Excellence in Digital Healthcare</p>
                         </div>
                     </div>
@@ -155,7 +155,7 @@ export default function BillingInvoiceModal({ isOpen, onClose, patient, professi
                             <span><strong>TELECEL CASH:</strong> 0200670575 (JULIUS KALETSI)</span>
                         </div>
                     </div>
-                    <p>Thank you for choosing Dr Kal&apos;s Virtual Hospital. Payment is due upon receipt.</p>
+                    <p>Thank you for choosing CareOnClick. Payment is due upon receipt.</p>
                     <p>Contact Support: drkalsvirtualhospital@gmail.com | +233 595 441 825</p>
                 </div>
 

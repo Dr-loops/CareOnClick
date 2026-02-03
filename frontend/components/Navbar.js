@@ -30,8 +30,8 @@ export default function Navbar() {
             <div className="container nav-container">
                 {/* Logo Section */}
                 <Link href="/" className="nav-logo">
-                    <img src="/logo.png" alt="Dr Kal Logo" />
-                    <span className="text-gradient">Dr Kal&apos;s</span>
+                    <img src="/logo_new.jpg" alt="CareOnClick Logo" />
+                    <span className="text-gradient">CareOnClick</span>
                 </Link>
 
                 {/* Desktop Nav Links */}
@@ -72,8 +72,8 @@ export default function Navbar() {
             <div className={`mobile-menu-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}>
                 <div className="mobile-menu-content" onClick={e => e.stopPropagation()}>
                     <div className="mobile-menu-header">
-                        <img src="/logo.png" alt="Logo" />
-                        <span className="text-gradient">Dr Kal&apos;s</span>
+                        <img src="/logo_new.jpg" alt="Logo" />
+                        <span className="text-gradient">CareOnClick</span>
                         <button onClick={() => setIsMenuOpen(false)}><X /></button>
                     </div>
 

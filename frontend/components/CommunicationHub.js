@@ -180,7 +180,7 @@ export default function CommunicationHub({
                                     if (!selectedTarget) return;
                                     const number = selectedTarget.whatsappNumber || selectedTarget.phoneNumber;
                                     const cleanNumber = number.replace(/\D/g, '');
-                                    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Hello ${selectedTarget.name}, this is ${user.name} from Dr. Kal's Virtual Hospital.`)}`, '_blank');
+                                    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Hello ${selectedTarget.name}, this is ${user.name} from CareOnClick.`)}`, '_blank');
                                 }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📱</div>

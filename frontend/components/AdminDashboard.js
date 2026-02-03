@@ -277,7 +277,7 @@ export default function AdminDashboard({ user }) {
 
     const exportData = () => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        let csvContent = `DR KAL'S VIRTUAL HOSPITAL - DAILY ACTIVITY REPORT\nGenerated on: ${new Date().toLocaleString()}\n\n`;
+        let csvContent = `CAREONCLICK - DAILY ACTIVITY REPORT\nGenerated on: ${new Date().toLocaleString()}\n\n`;
 
         // 1. PATIENT PROFILES REPORT
         csvContent += "SECTION 1: REGISTERED PATIENT PERSONAL DATA\n";
@@ -499,10 +499,10 @@ export default function AdminDashboard({ user }) {
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', color: 'white',
                                 boxShadow: '0 10px 15px -3px rgba(30, 58, 138, 0.3)'
                             }}>
-                                🏥
+                                <img src="/logo_new.jpg" alt="Logo" style={{ width: '40px', height: '40px' }} />
                             </div>
                             <div>
-                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: colors.text }}>Admin Panel</h1>
+                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: colors.text }}>CareOnClick Admin Portal</h1>
                                 <p style={{ margin: '4px 0 0 0', color: colors.textLight }}>Hospital Control Center</p>
                             </div>
                         </div>
@@ -1494,7 +1494,7 @@ export default function AdminDashboard({ user }) {
                             <div style={{ padding: '32px', background: 'white' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '32px', borderBottom: '2px solid #000', paddingBottom: '24px' }}>
                                     <div>
-                                        <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                                        <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>CAREONCLICK</h1>
                                         <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '4px' }}>Official Medical Record</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>

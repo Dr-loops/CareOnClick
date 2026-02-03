@@ -15,7 +15,7 @@ interface DashboardLayoutProps {
     avatarUrl?: string; // [NEW]
 }
 
-export default function DashboardLayout({ children, role, userName = 'Dr. Kal', avatarUrl, sidebarItems, activeTab, onTabChange, onAvatarClick }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, role, userName = 'CareOnClick Team', avatarUrl, sidebarItems, activeTab, onTabChange, onAvatarClick }: DashboardLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);

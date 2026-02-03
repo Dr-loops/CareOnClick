@@ -28,7 +28,7 @@ export default function Sidebar({ role, isOpen, toggle, items, activeTab, onTabC
         <div className="sidebar-container">
             <div className="sidebar-header">
                 <h2 className={`sidebar-title ${isOpen ? '' : 'hidden'}`}>
-                    Dr. Kal&apos;s <span className="brand-highlight">VH</span>
+                    CareOnClick
                 </h2>
                 <button onClick={toggle} className="btn-secondary sidebar-toggle">
                     {isOpen ? '◀' : '▶'}

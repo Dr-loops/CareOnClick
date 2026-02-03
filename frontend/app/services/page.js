@@ -87,7 +87,7 @@ export default function ServicesPage() {
                 }}>
                     <h2 style={{ color: 'var(--color-sea-blue)' }}>We Work Remotely</h2>
                     <p style={{ maxWidth: '700px', margin: '1rem auto 2rem', fontSize: '1.1rem', lineHeight: '1.6' }}>
-                        At Dr Kal's Virtual Hospital, we believe location shouldn't limit access to quality healthcare.
+                        At CareOnClick, we believe location shouldn't limit access to quality healthcare.
                         Our entire team of professionals works remotely to serve you better, faster, and more safely.
                     </p>
                     <Link href="/register" className="btn btn-primary" style={{ fontSize: '1.1rem', padding: '0.75rem 2rem' }}>

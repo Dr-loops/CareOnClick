@@ -2313,7 +2313,6 @@ h6 {
     flex-direction: row !important;
     overflow-x: auto !important;
     padding-bottom: 5px !important;
-    -webkit-overflow-scrolling: touch;
     gap: 0.5rem !important;
   }
 
@@ -2369,7 +2368,6 @@ h6 {
   table {
     display: block !important;
     overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
   }
 
   th,
@@ -2538,4 +2536,22 @@ h6 {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+/* Vitals Monitor Styles */
+.vitals-header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.vitals-logo {
+  height: 32px;
+}
+
+.vitals-logo.minimal {
+  height: 24px;
+}
+
+.vitals-title {
+  margin: 0;
 }

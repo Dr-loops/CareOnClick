@@ -29,7 +29,7 @@ const ADHERENCE_DATA = [
 ];
 
 const DEFAULT_LOGS = [
-    { id: 1, date: '2024-10-24', drug: 'Morphine Sulfate 15mg', qty: 30, patient: 'John Doe', prescriber: 'Dr. Kals', pharmacist: 'Jane P.', type: 'Dispense' },
+    { id: 1, date: '2024-10-24', drug: 'Morphine Sulfate 15mg', qty: 30, patient: 'John Doe', prescriber: 'CareOnClick', pharmacist: 'Jane P.', type: 'Dispense' },
     { id: 2, date: '2024-10-25', drug: 'Oxycodone 5mg', qty: 60, patient: 'Alice Smith', prescriber: 'Dr. House', pharmacist: 'Jane P.', type: 'Dispense' },
     { id: 3, date: '2024-10-26', drug: 'Methylphenidate 10mg', qty: 100, patient: 'Pharmacy Stock', prescriber: 'N/A', pharmacist: 'System', type: 'Restock' },
 ];

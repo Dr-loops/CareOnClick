@@ -350,7 +350,7 @@ export default function PatientDashboard({ user }) {
 
             socket.on('receive_message', (data) => {
                 dispatchSync();
-                setToast({ message: `New message from ${data.senderName || 'Dr. Kal'}`, type: 'info' });
+                setToast({ message: `New message from ${data.senderName || 'CareOnClick'}`, type: 'info' });
             });
 
             return () => {
@@ -388,8 +388,8 @@ export default function PatientDashboard({ user }) {
 
             {/* Print Header */}
             <div className="print-only" style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                <img src="/logo.png" alt="Dr Kal Logo" style={{ height: '80px', marginBottom: '1rem' }} />
-                <h1 style={{ margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '80px', marginBottom: '1rem' }} />
+                <h1 style={{ margin: 0 }}>CAREONCLICK</h1>
                 <h2 style={{ margin: '0.5rem 0' }}>PATIENT OFFICIAL RECORD</h2>
                 <p style={{ fontSize: '0.9rem' }}>Date: {new Date().toLocaleDateString()} | Time: {new Date().toLocaleTimeString()}</p>
             </div>
@@ -398,7 +398,7 @@ export default function PatientDashboard({ user }) {
             <aside className="card" style={{ height: 'fit-content', padding: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ width: '80px', height: '80px', background: 'var(--color-cyan-sand)', borderRadius: '50%', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                        👤
+                        <img src="/logo_new.jpg" alt="Logo" style={{ width: '40px', height: '40px' }} />
                     </div>
                     <h3>{displayName}</h3>
                     <p style={{ color: 'var(--text-secondary)' }}>Patient ID: {displayId}</p>
@@ -903,7 +903,7 @@ export default function PatientDashboard({ user }) {
                                                 })()}
                                                 <div>
                                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Professional</div>
-                                                    <div style={{ fontWeight: 'bold' }}>{selectedProfessional?.name || 'Dr. Kal'}</div>
+                                                    <div style={{ fontWeight: 'bold' }}>{selectedProfessional?.name || 'CareOnClick'}</div>
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Date & Time</div>
@@ -1414,8 +1414,8 @@ export default function PatientDashboard({ user }) {
                                             </head>
                                             <body>
                                                 <div class="header">
-                                                    <img src="${window.location.origin}/logo.png" alt="Logo" style="height: 80px; margin-bottom: 10px;">
-                                                    <div class="logo">DR. KAL'S VIRTUAL HOSPITAL</div>
+                                                    <img src="${window.location.origin}/logo_new.jpg" alt="Logo" style="height: 80px; margin-bottom: 10px;">
+                                                    <div class="logo">CAREONCLICK</div>
                                                     <div>OFFICIAL LABORATORY REPORT</div>
                                                 </div>
                                                 
@@ -1848,13 +1848,16 @@ export default function PatientDashboard({ user }) {
                     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '2rem' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                                <div>
-                                    <h3 style={{ margin: 0 }}>
-                                        {previewFile.professionalRole === 'DOCTOR' ? '🩺 Digital Clinical Record' : (previewFile.professionalRole === 'NURSE' ? '📋 Nursing Information' : '🔬 Laboratory Analysis Report')}
-                                    </h3>
-                                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
-                                        {previewFile.structuredResults?.testName || previewFile.fileName} | Date: {previewFile.date}
-                                    </p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '45px' }} />
+                                    <div>
+                                        <h3 style={{ margin: 0 }}>
+                                            {previewFile.professionalRole === 'DOCTOR' ? '🩺 Digital Clinical Record' : (previewFile.professionalRole === 'NURSE' ? '📋 Nursing Information' : '🔬 Laboratory Analysis Report')}
+                                        </h3>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
+                                            {previewFile.structuredResults?.testName || previewFile.fileName} | Date: {previewFile.date}
+                                        </p>
+                                    </div>
                                 </div>
                                 <button onClick={() => setPreviewFile(null)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>Close</button>
                             </div>

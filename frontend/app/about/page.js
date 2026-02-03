@@ -9,7 +9,7 @@ export default function AboutPage() {
             {/* Hero Header */}
             <header style={{ textAlign: 'center', marginBottom: '5rem' }}>
                 <h1 style={{ fontSize: '3.5rem', color: 'var(--color-navy)', marginBottom: '1.5rem', fontWeight: '800', letterSpacing: '-0.02em' }}>
-                    About Dr Kal&apos;s <span style={{ color: 'var(--color-sea-blue)' }}>Virtual Hospital</span>
+                    About <span style={{ color: 'var(--color-sea-blue)' }}>CareOnClick</span>
                 </h1>
                 <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', maxWidth: '800px', margin: '0 auto', lineHeight: '1.8' }}>
                     Pioneering a borderless digital healthcare ecosystem. We bridge the gap between world-class medical expertise and your doorstep through innovation, empathy, and integrity.
@@ -69,7 +69,7 @@ export default function AboutPage() {
                         Dr. Julius Kaletsi is a visionary medical professional committed to transforming healthcare delivery through technology. An alumnus of the esteemed <strong>University for Development Studies (UDS), Tamale Campus</strong> in the Northern Region of Ghana, Dr. Kaletsi brings a unique blend of clinical excellence and technological foresight.
                     </p>
                     <p style={{ lineHeight: '1.8', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                        Witnessing the disparities in healthcare access first-hand during his studies in the Northern Region, he founded Dr. Kal’s Virtual Hospital to ensure that high-quality medical guidance is a right, not a privilege, regardless of geographical location.
+                        Witnessing the disparities in healthcare access first-hand during his studies in the Northern Region, he founded CareOnClick to ensure that high-quality medical guidance is a right, not a privilege, regardless of geographical location.
                     </p>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
@@ -106,7 +106,7 @@ export default function AboutPage() {
                             <div>
                                 <h3 style={{ marginBottom: '1rem' }}>Next-Gen Infrastructure</h3>
                                 <p style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-                                    Utilizing low-latency WebRTC for crystalline video calls and high-availability PostgreSQL clusters for data integrity, Dr. Kal’s Virtual Hospital is built on a robust architecture designed for 24/7 reliability and data safety.
+                                    Utilizing low-latency WebRTC for crystalline video calls and high-availability PostgreSQL clusters for data integrity, CareOnClick is built on a robust architecture designed for 24/7 reliability and data safety.
                                 </p>
                             </div>
                         </div>

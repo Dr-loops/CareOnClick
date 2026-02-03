@@ -383,7 +383,7 @@ export default function PharmacyDashboard({ user }) {
                         {userProfile.avatarUrl ? (
                             <img src={userProfile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                            '💊'
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         )}
                     </div>
                     <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>{userProfile.name}</h3>
@@ -416,8 +416,8 @@ export default function PharmacyDashboard({ user }) {
             <main style={{ padding: '2.5rem', overflowY: 'auto' }}>
                 <header className="tab-header">
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '2rem', color: '#0f172a' }}>{PHARMACY_TABS.find(t => t.id === activeTab)?.name}</h1>
-                        <p style={{ margin: 0, color: '#64748b' }}>Manage your pharmacy workflow efficiently.</p>
+                        <h1 style={{ margin: 0, fontSize: '2rem', color: '#0f172a' }}>CareOnClick Pharmacy {PHARMACY_TABS.find(t => t.id === activeTab)?.name}</h1>
+                        <p style={{ margin: 0, color: '#64748b' }}>Manage your pharmacy workflow efficiently with CareOnClick.</p>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <div style={{ position: 'relative' }}>

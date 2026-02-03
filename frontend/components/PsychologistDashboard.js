@@ -100,6 +100,7 @@ export default function PsychologistDashboard({ user }) {
     const [dictatedNote, setDictatedNote] = useState('');
     const [toast, setToast] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [invoiceData, setInvoiceData] = useState(null); // [NEW] { patient: {}, isOpen: true/false }
 
 
 
@@ -163,7 +164,7 @@ export default function PsychologistDashboard({ user }) {
                         {userProfile.avatarUrl ? (
                             <img src={userProfile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                            '🧠'
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         )}
                     </div>
                     <h4>{userProfile.name}</h4>
@@ -190,7 +191,7 @@ export default function PsychologistDashboard({ user }) {
             <main style={{ background: 'white', padding: '2rem', overflowY: 'auto' }}>
                 {activeTab === 'overview' && (
                     <div>
-                        <h2>Psychology Department Overview</h2>
+                        <h2>CareOnClick Psychology Department Overview</h2>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
                             <div className="card" style={{ padding: '2rem', textAlign: 'center', background: '#f0f9ff' }}>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#0ea5e9' }}>{normalizedPatients.length}</div>
@@ -207,7 +208,7 @@ export default function PsychologistDashboard({ user }) {
                 {activeTab === 'patients' && (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                            <h2>Patient Management</h2>
+                            <h2>CareOnClick Patient Management</h2>
                             <input
                                 type="text"
                                 placeholder="Search patients..."

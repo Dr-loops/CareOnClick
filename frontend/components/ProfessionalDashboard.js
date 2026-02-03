@@ -690,8 +690,8 @@ export default function ProfessionalDashboard({ user }) {
 
             {/* Print Header */}
             <div className="print-only" style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                <img src="/logo.png" alt="Dr Kal Logo" style={{ height: '80px', marginBottom: '1rem' }} />
-                <h1 style={{ margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '80px', marginBottom: '1rem' }} />
+                <h1 style={{ margin: 0 }}>CAREONCLICK</h1>
                 <h2 style={{ margin: '0.5rem 0' }}>OFFICIAL LABORATORY REPORT</h2>
                 <p style={{ fontSize: '0.9rem' }}>Date: {new Date().toLocaleDateString()} | Time: {new Date().toLocaleTimeString()}</p>
             </div>
@@ -766,7 +766,7 @@ export default function ProfessionalDashboard({ user }) {
                                                             )}
                                                             {patient.whatsappNumber && (
                                                                 <div onClick={(e) => e.stopPropagation()}>
-                                                                    <WhatsAppButton phoneNumber={patient.whatsappNumber} label="WhatsApp" message={`Hello ${patient.name}, this is Dr. Kal's office.`} />
+                                                                    <WhatsAppButton phoneNumber={patient.whatsappNumber} label="WhatsApp" message={`Hello ${patient.name}, this is CareOnClick office.`} />
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1476,7 +1476,10 @@ export default function ProfessionalDashboard({ user }) {
                         ) : activeLabTab === 'patient-records' ? (
                             <Card>
                                 <div style={{ marginBottom: '1.5rem' }}>
-                                    <h3>Clinical Summary: {selectedPatient ? selectedPatient.name : 'Select Patient'}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                        <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '40px' }} />
+                                        <h3 style={{ margin: 0 }}>Clinical Summary: {selectedPatient ? selectedPatient.name : 'Select Patient'}</h3>
+                                    </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
                                         <div style={{ flex: 1 }}>
                                             <PatientAutofillInputs

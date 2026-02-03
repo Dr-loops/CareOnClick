@@ -87,7 +87,10 @@ export default function VitalsMonitor({ patient, minimal = false }: VitalsMonito
     return (
         <Card className="vitals-monitor-card">
             <div className={`vitals-header ${minimal ? 'minimal' : ''}`}>
-                <h3>Real-time Vitals Monitoring</h3>
+                <div className="vitals-header-content">
+                    <img src="/logo_new.jpg" alt="CareOnClick Logo" className={`vitals-logo ${minimal ? 'minimal' : ''}`} />
+                    <h3 className="vitals-title">Real-time Vitals Monitoring</h3>
+                </div>
                 <Button variant="secondary" size="small">📡 Connect Wearable</Button>
             </div>
 

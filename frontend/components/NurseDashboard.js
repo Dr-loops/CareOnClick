@@ -494,7 +494,10 @@ export default function NurseDashboard({ user }) {
                         <div>
                             <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <h3 style={{ margin: 0 }}>Patient Information</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                        <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '40px' }} />
+                                        <h3 style={{ margin: 0 }}>Patient Information</h3>
+                                    </div>
                                     {searchQuery && <span style={{ fontSize: '0.75rem', color: 'var(--color-navy)', fontWeight: 'bold' }}>MATCH FOUND</span>}
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
