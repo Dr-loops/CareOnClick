@@ -338,57 +338,55 @@ export default function AdminDashboard({ user }) {
     // --- PATIENT MANAGEMENT ---
     const handleSavePatient = async (updatedData) => {
         try {
-            // 1. Update Core User Data (Name, Phone, WhatsApp) via /api/db
-            await fetch('/api/db', {
+            // Prepare Unified Payload for Backend Sync
+            const payload = {
+                ...updatedData,
+                fullName: updatedData.name,
+                phoneNumber: updatedData.phoneNumber,
+                whatsappNumber: updatedData.whatsappNumber,
+                sex: updatedData.sex,
+                address: updatedData.address,
+                age: updatedData.age,
+                medicalHistory: updatedData.medicalHistory,
+                allergies: updatedData.allergies,
+                currentMedications: updatedData.currentMedications,
+                region: updatedData.region,
+                country: updatedData.country
+            };
+
+            // 1. Update via Unified DB Sync (Handles both tables)
+            const res = await fetch('/api/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    collection: 'users',
-                    action: 'update',
+                    collection: 'patient_profiles',
+                    action: 'save',
                     id: updatedData.id,
-                    updates: {
-                        name: updatedData.name,
-                        phoneNumber: updatedData.phoneNumber,
-                        whatsappNumber: updatedData.whatsappNumber,
-                        email: updatedData.email,
-                        address: updatedData.address,
-                        currentFacility: updatedData.facility, // Mapped to Schema Field
-                        licenseNumber: updatedData.licenseNumber,
-                        yearsOfExperience: parseInt(updatedData.yearsOfExperience) || 0, // Ensure Int
-                        specialization: updatedData.category || updatedData.role, // Map category to specialization too
-                        // role is usually immutable or separate, but we can sync it if needed
-                        avatarUrl: updatedData.avatarUrl
-                    }
+                    item: payload
                 })
             });
 
-            // 2. Update Extended Profile Data via savePatientProfile
-            const profileUpdates = {
-                ...updatedData.profile,
-                age: updatedData.age,
-                sex: updatedData.sex,
-                gender: updatedData.sex, // Sync both
-                address: updatedData.address,
-                medicalHistory: updatedData.medicalHistory
-            };
+            if (!res.ok) throw new Error("Failed to save patient profile");
 
-            await savePatientProfile(updatedData.id, profileUpdates);
-
-            // 3. Optimistic UI Update (Immediate)
+            // 2. Update Local State for Immediate UI Feedback
             setDbUsers(prevUsers => prevUsers.map(u => {
                 if (u.id === updatedData.id) {
-                    return { ...u, ...updatedData, profile: { ...u.profile, ...profileUpdates } };
+                    return {
+                        ...u,
+                        ...payload,
+                        profile: { ...u.profile, ...payload }
+                    };
                 }
                 return u;
             }));
 
-            // 4. Background Refresh
-            fetchUsers();
+            // 3. Close Modal & Refresh
             setEditingPatient(null);
-            alert("Patient details updated successfully!");
+            setTimeout(fetchUsers, 500);
+            alert("Patient details and medical history updated successfully!");
         } catch (error) {
             console.error("Failed to update patient", error);
-            alert("Failed to update patient. Please try again.");
+            alert("Failed to update patient: " + error.message);
         }
     };
 

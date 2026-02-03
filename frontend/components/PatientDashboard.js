@@ -212,36 +212,43 @@ export default function PatientDashboard({ user }) {
 
                 if (serverProfile || serverUser) {
                     const mergedProfile = {
-                        // Base: User Session Data (least priority for mutable fields but good for defaults)
-                        fullName: user.name,
-                        email: user.email,
+                        // Base: User Session Data
+                        fullName: serverUser?.name || user.name,
+                        email: serverUser?.email || user.email,
+                        id: serverUser?.id || user.id,
+                        pathNumber: serverUser?.pathNumber || user.pathNumber,
 
-                        // Layer 1: Server User Data (Has region, country, phoneNumber)
-                        ...serverUser,
+                        // Layer 1: Server User Data
+                        phoneNumber: serverUser?.phoneNumber,
+                        whatsappNumber: serverUser?.whatsappNumber,
+                        region: serverUser?.region,
+                        country: serverUser?.country || 'Ghana',
+                        address: serverUser?.address,
+                        avatarUrl: serverUser?.avatarUrl,
 
-                        // Layer 2: Server Profile Data (Has address, medical history, specialized fields)
+                        // Layer 2: Server Profile Data (Overrides & Medical)
                         ...(serverProfile || {}),
 
-                        // Explicit Field Mapping & Overrides
+                        // Explicit Mapping & Aliases for UI consistency
                         phone: serverUser?.phoneNumber || serverProfile?.phoneNumber || user.phone,
-                        region: serverUser?.region || serverProfile?.region || user.region,
-                        country: serverUser?.country || user.country || 'Ghana',
-                        avatarUrl: serverUser?.avatarUrl || user.avatarUrl,
-
-                        // Map Profile Specifics
+                        sex: serverProfile?.gender || serverUser?.gender || 'Not Set',
+                        gender: serverProfile?.gender || serverUser?.gender || 'Not Set',
                         dob: serverProfile?.dateOfBirth,
-                        gender: serverProfile?.gender || serverProfile?.sex || serverUser?.gender
                     };
 
-                    if (serverProfile?.dateOfBirth && !mergedProfile.age) {
-                        // Recalculate age if missing but DOB exists
-                        const dob = new Date(serverProfile.dateOfBirth);
-                        const diff_ms = Date.now() - dob.getTime();
-                        const age_dt = new Date(diff_ms);
-                        mergedProfile.age = Math.abs(age_dt.getUTCFullYear() - 1970);
+                    // Robust Age Calculation
+                    if (mergedProfile.dateOfBirth) {
+                        const dob = new Date(mergedProfile.dateOfBirth);
+                        const today = new Date();
+                        let age = today.getFullYear() - dob.getFullYear();
+                        const m = today.getMonth() - dob.getMonth();
+                        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                            age--;
+                        }
+                        mergedProfile.age = age;
                     }
 
-                    setProfile(prev => ({ ...prev, ...mergedProfile }));
+                    setProfile(mergedProfile);
 
                     // Update LocalStorage to keep sync
                     const saved = JSON.parse(localStorage.getItem(KEYS.PATIENT_PROFILES) || '{}');
@@ -277,44 +284,65 @@ export default function PatientDashboard({ user }) {
         setProfileStatus({ type: '', message: '' });
 
         try {
-            // 1. Update User Table (Name, Avatar, Phone, Password if any)
-            const userPayload = {
+            // 1. Prepare Payload for Hybrid Update (User + Profile)
+            const payload = {
+                ...profile,
                 name: (profile.fullName || profile.name || user.name || '').trim(),
                 phoneNumber: profile.phone || profile.phoneNumber,
                 whatsappNumber: profile.whatsappNumber,
                 region: profile.region,
                 country: profile.country,
+                address: profile.address,
+                gender: profile.sex || profile.gender,
                 avatarUrl: profile.avatarUrl,
+                age: profile.age // Send age for fallback calc if dob missing
             };
 
-            if (!userPayload.name) {
+            if (!payload.name) {
                 throw new Error("Full Name is required.");
             }
 
+            // 2. Add password if provided
             if (passwords.new) {
                 if (passwords.new !== passwords.confirm) {
                     throw new Error("New passwords do not match");
                 }
-                userPayload.password = passwords.new;
+                payload.password = passwords.new;
             }
 
-            const userRes = await fetch('/api/user/profile', {
-                method: 'PATCH',
+            // 3. Sync to Server via specialized multi-table handler
+            const res = await fetch('/api/db', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(userPayload)
+                body: JSON.stringify({
+                    collection: 'patient_profiles',
+                    action: 'save',
+                    id: patientId,
+                    item: payload
+                })
             });
 
-            if (!userRes.ok) {
-                const errorData = await userRes.json().catch(() => ({}));
-                throw new Error(errorData.error || "Failed to update user identity");
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to update profile");
             }
 
-            // 2. Update Patient Profile Table (Address, DOB, etc.)
-            savePatientProfile(patientId, profile);
+            // 4. Update Local Identity for UI session sync
+            await fetch('/api/user/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: payload.name,
+                    phoneNumber: payload.phoneNumber,
+                    avatarUrl: payload.avatarUrl
+                })
+            }).catch(e => console.error("Identity sync error", e));
 
             setProfileStatus({ type: 'success', message: 'Profile updated successfully!' });
             setPasswords({ current: '', new: '', confirm: '' });
-            fetchProfile(); // Refresh
+
+            // Refresh local state immediately
+            setTimeout(fetchProfile, 500);
         } catch (err) {
             console.error("Profile Update Error:", err);
             setProfileStatus({ type: 'error', message: err.message });
