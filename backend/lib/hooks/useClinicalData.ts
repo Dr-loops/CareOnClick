@@ -32,7 +32,7 @@ interface Task {
     [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-import { assessPatientRisk } from '@/lib/ai_logic';
+import { assessPatientRisk } from '../ai_logic';
 
 export function usePatients(query = '') {
     const { data, error, isLoading, mutate } = useSWR<Patient[]>(

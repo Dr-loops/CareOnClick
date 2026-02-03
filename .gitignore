@@ -3,3 +3,11 @@ node_modules
 .env
 
 /lib/generated/prisma
+.next
+out
+build
+dist
+.DS_Store
+*.log
+*.db
+*.sqlite
