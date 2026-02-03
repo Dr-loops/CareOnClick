@@ -2,6 +2,7 @@ import { Montserrat, Open_Sans } from 'next/font/google';
 import './globals.css';
 import Navbar from '../components/Navbar';
 import DashboardNav from '../components/DashboardNav';
+import Footer from '../components/Footer';
 import { AuthProvider } from '@/components/AuthProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }) {
                             {children}
                         </ErrorBoundary>
                     </main>
+                    <Footer />
                 </AuthProvider>
             </body>
         </html>
