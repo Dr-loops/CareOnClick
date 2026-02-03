@@ -2832,3 +2832,144 @@ h6 {
 .placeholder-content h3 {
   color: var(--color-grey-500);
 }
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+
+  /* Global Container */
+  .container {
+    padding: 0 1rem;
+  }
+
+  /* Home Page Hero */
+  .hero-section {
+    flex-direction: column;
+    text-align: center;
+    padding-top: 6rem;
+    /* Account for fixed nav */
+  }
+
+  .hero-content {
+    margin-bottom: 2rem;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .hero-btns {
+    justify-content: center;
+  }
+
+  /* Features Grid */
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard Grids */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    display: flex;
+    height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: 1rem;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .dashboard-sidebar .sidebar-container {
+    padding: 0.5rem;
+    width: 100%;
+  }
+
+  .dashboard-sidebar .sidebar-nav {
+    flex-direction: row;
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .dashboard-sidebar .sidebar-btn {
+    width: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+  }
+
+  .dashboard-sidebar .sidebar-btn.active {
+    border-left: none;
+    border-bottom: 3px solid var(--color-primary-500);
+    background: var(--color-primary-50);
+  }
+
+  .dashboard-sidebar .sidebar-title,
+  .dashboard-sidebar .sidebar-toggle,
+  .dashboard-sidebar .sidebar-header {
+    display: none;
+  }
+
+  .patient-info-grid,
+  .trends-grid,
+  .charthub-grid,
+  .telehealth-grid,
+  .action-center-grid,
+  .comm-hub-grid,
+  .tasks-grid,
+  .engagement-grid,
+  .analytics-grid,
+  .patient-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  /* Tables */
+  .table-container,
+  .overview-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+    display: block;
+  }
+
+  table {
+    min-width: 600px;
+    /* Force scroll on small screens */
+  }
+
+  /* Modals */
+  .modal-content {
+    width: 95%;
+    padding: var(--spacing-md);
+    margin: 1rem;
+  }
+
+  /* Charts/Graphs */
+  .recharts-responsive-container {
+    height: 300px !important;
+  }
+
+  /* Utility Helpers */
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  /* Navbar adjustment */
+  .nav-links-desktop {
+    display: none;
+  }
+
+  .mobile-menu-toggle {
+    display: block;
+  }
+}

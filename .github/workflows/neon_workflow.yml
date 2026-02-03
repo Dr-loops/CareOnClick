@@ -12,5 +12,6 @@ jobs:
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           api_key: ${{ secrets.NEON_API_KEY }}
+          username: neondb_owner
           # The branch name defaults to preview/pr-${{ github.event.number }}
           # The action also handles branch deletion when the PR is closed
