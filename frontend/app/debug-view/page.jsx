@@ -9,9 +9,9 @@ export default function DebugPage() {
     };
 
     const status = {
-        database_url: vars.DATABASE_URL ? (vars.DATABASE_URL.startsWith('postgres') ? '✅ Present' : '⚠️ Invalid Format') : '❌ MISSING',
-        admin_secret: vars.ADMIN_SECRET_KEY ? '✅ Present' : '❌ MISSING',
-        auth_secret: vars.AUTH_SECRET ? '✅ Present' : '❌ MISSING',
+        database_url: vars.DATABASE_URL ? (vars.DATABASE_URL.startsWith('postgres') ? 'Present' : 'Invalid Format') : 'MISSING',
+        admin_secret: vars.ADMIN_SECRET_KEY ? 'Present' : 'MISSING',
+        auth_secret: vars.AUTH_SECRET ? 'Present' : 'MISSING',
         environment: vars.NODE_ENV || 'unknown'
     };
 
@@ -25,8 +25,8 @@ export default function DebugPage() {
             <div style={{ marginTop: '2rem', padding: '1rem', background: '#f0f9ff' }}>
                 <h3>Troubleshooting Guide:</h3>
                 <ul>
-                    <li>If <b>DATABASE_URL</b> is ❌ MISSING: Go to Vercel -> Settings -> Environment Variables and Add it.</li>
-                    <li>Don't forget to <b>REDEPLOY</b> after adding variables.</li>
+                    <li>If <strong>DATABASE_URL</strong> is MISSING: Go to Vercel -&gt; Settings -&gt; Environment Variables and Add it.</li>
+                    <li>Don't forget to <strong>REDEPLOY</strong> after adding variables.</li>
                 </ul>
             </div>
         </div>
