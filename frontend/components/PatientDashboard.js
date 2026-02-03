@@ -254,6 +254,23 @@ export default function PatientDashboard({ user }) {
         }
     };
 
+    const handleAvatarUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Check file size (limit to 1MB for Base64 storage)
+        if (file.size > 1024 * 1024) {
+            setProfileStatus({ type: 'error', message: 'Image too large. Please select an image under 1MB.' });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setProfile(prev => ({ ...prev, avatarUrl: reader.result }));
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleUpdateProfile = async (e) => {
         if (e) e.preventDefault();
         setProfileLoading(true);
@@ -262,13 +279,17 @@ export default function PatientDashboard({ user }) {
         try {
             // 1. Update User Table (Name, Avatar, Phone, Password if any)
             const userPayload = {
-                name: profile.fullName || profile.name,
+                name: (profile.fullName || profile.name || user.name || '').trim(),
                 phoneNumber: profile.phone || profile.phoneNumber,
                 whatsappNumber: profile.whatsappNumber,
                 region: profile.region,
                 country: profile.country,
                 avatarUrl: profile.avatarUrl,
             };
+
+            if (!userPayload.name) {
+                throw new Error("Full Name is required.");
+            }
 
             if (passwords.new) {
                 if (passwords.new !== passwords.confirm) {
@@ -283,7 +304,10 @@ export default function PatientDashboard({ user }) {
                 body: JSON.stringify(userPayload)
             });
 
-            if (!userRes.ok) throw new Error("Failed to update user identity");
+            if (!userRes.ok) {
+                const errorData = await userRes.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to update user identity");
+            }
 
             // 2. Update Patient Profile Table (Address, DOB, etc.)
             savePatientProfile(patientId, profile);
@@ -292,6 +316,7 @@ export default function PatientDashboard({ user }) {
             setPasswords({ current: '', new: '', confirm: '' });
             fetchProfile(); // Refresh
         } catch (err) {
+            console.error("Profile Update Error:", err);
             setProfileStatus({ type: 'error', message: err.message });
         } finally {
             setProfileLoading(false);
@@ -550,24 +575,63 @@ export default function PatientDashboard({ user }) {
                             <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
                                 <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                                    <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
-                                        {profile.avatarUrl ? (
-                                            <img src={profile.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>No Image</div>
-                                        )}
+                                    <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+                                        <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#fff', border: '2px solid var(--color-navy)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                                            {profile.avatarUrl ? (
+                                                <img src={profile.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', background: '#f1f5f9' }}>
+                                                    <span style={{ fontSize: '2.5rem' }}>👤</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <label
+                                            htmlFor="avatar-upload"
+                                            style={{
+                                                position: 'absolute', bottom: '5px', right: '5px',
+                                                background: 'var(--color-navy)', color: 'white',
+                                                width: '32px', height: '32px', borderRadius: '50%',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                fontSize: '1.2rem', border: '2px solid white'
+                                            }}
+                                            title="Upload from device"
+                                        >
+                                            📷
+                                            <input
+                                                id="avatar-upload"
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleAvatarUpload}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Avatar URL</label>
-                                        <input
-                                            type="text"
-                                            className="input"
-                                            placeholder="Paste image URL here"
-                                            value={profile.avatarUrl || ''}
-                                            onChange={(e) => setProfile({ ...profile, avatarUrl: e.target.value })}
-                                            style={{ padding: '0.8rem' }}
-                                        />
-                                        <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.4rem' }}>For a premium look, use a professional headshot URL.</p>
+                                        <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b' }}>Upload Photo</h4>
+                                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem 0' }}>
+                                            Pick a clear photo from your device. Maximun size 1MB.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => document.getElementById('avatar-upload').click()}
+                                                className="btn btn-secondary"
+                                                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                                            >
+                                                Choose File
+                                            </button>
+                                            {profile.avatarUrl && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setProfile({ ...profile, avatarUrl: '' })}
+                                                    className="btn btn-secondary"
+                                                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', color: '#dc2626' }}
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

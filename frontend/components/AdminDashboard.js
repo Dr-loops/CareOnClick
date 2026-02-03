@@ -181,6 +181,22 @@ export default function AdminDashboard({ user }) {
         }
     }, [activeTab]);
 
+    const handleAvatarUpload = (e, setter, currentData) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 1024 * 1024) {
+            alert('Image too large. Please select an image under 1MB.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setter({ ...currentData, avatarUrl: reader.result });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const appointments = dbAppointments;
 
     // Unified Staff Data Logic
@@ -856,6 +872,28 @@ export default function AdminDashboard({ user }) {
                                             </div>
                                         </div>
 
+                                        <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                                                    {editingPatient.avatarUrl ? (
+                                                        <img src={editingPatient.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>👤</div>
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleAvatarUpload(e, setEditingPatient, editingPatient)}
+                                                        style={{ display: 'block', marginBottom: '8px' }}
+                                                    />
+                                                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Max size 1MB. Base64 encoded.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div style={{ display: 'grid', gridTemplateColumns: '100px 100px 1fr', gap: '16px', marginBottom: '24px' }}>
                                             <div>
                                                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '0.9rem' }}>Age</label>
@@ -1162,6 +1200,29 @@ export default function AdminDashboard({ user }) {
                             <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '32px' }}>Edit Staff Profile</h2>
 
                             <form onSubmit={(e) => { e.preventDefault(); handleSaveProfessional(editingProfessional); }}>
+                                {/* Avatar */}
+                                <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                                            {editingProfessional.avatarUrl ? (
+                                                <img src={editingProfessional.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>👤</div>
+                                            )}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleAvatarUpload(e, setEditingProfessional, editingProfessional)}
+                                                style={{ display: 'block', marginBottom: '8px' }}
+                                            />
+                                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Max size 1MB. Base64 encoded.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Basic Info */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                                     <div>

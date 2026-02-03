@@ -46,7 +46,7 @@ function AuthStateAdapter({ children }) {
 
             if (result?.error) {
                 console.error("Login Error:", result.error);
-                return { success: false, error: 'Invalid credentials. Please check your email/password.' };
+                return { success: false, error: `Login Failed (${result.error}): Please check your email/password.` };
             }
 
             if (result?.ok) {

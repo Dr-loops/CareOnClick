@@ -426,10 +426,10 @@ export default function ProfessionalDashboard({ user }) {
 
     const fileInputRef = useRef(null);
 
-    if (isNurse) return <NurseDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isPharmacist) return <PharmacyDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isDietician) return <DieticianDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isPsychologist) return <PsychologistDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
+    if (isNurse) return <NurseDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isPharmacist) return <PharmacyDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isDietician) return <DieticianDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isPsychologist) return <PsychologistDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
 
     // ... (rest of filtering) ...
 

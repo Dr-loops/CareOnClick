@@ -171,10 +171,9 @@ export default function PharmacyDashboard({ user }) {
 
     // Defensive: Ensure we're working with arrays and filter out nulls
     const validGlobalRx = (Array.isArray(globalPrescriptions) ? globalPrescriptions : []).filter(item => item && typeof item === 'object');
-    const validMockRx = (Array.isArray(MOCK_PHARMACY_DATA?.prescriptions) ? MOCK_PHARMACY_DATA.prescriptions : []).filter(item => item && typeof item === 'object');
 
     // Filter to only show prescriptions for REAL patients
-    const prescriptions = (validGlobalRx.length > 0 ? validGlobalRx : validMockRx).filter(rx =>
+    const prescriptions = (validGlobalRx).filter(rx =>
         rx && rx.patientId && Array.isArray(realPatients) && realPatients.find(p => p && (p.id === rx.patientId || p.pathNumber === rx.patientId))
     );
 
@@ -197,9 +196,9 @@ export default function PharmacyDashboard({ user }) {
             } catch (e) {
                 console.error('Failed to load inventory', e);
             }
-            // Fallback
-            console.log('Loading MOCK Inventory');
-            setInventory(Array.isArray(MOCK_PHARMACY_DATA?.inventory) ? MOCK_PHARMACY_DATA.inventory : []);
+            // Fallback (Empty)
+            console.log('No inventory found, initializing empty.');
+            setInventory([]);
         }
     }, []);
 

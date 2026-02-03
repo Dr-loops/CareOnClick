@@ -35,6 +35,14 @@ export async function PATCH(request) {
             updateData.password = await bcrypt.hash(password, 10);
         }
 
+        // Optional: Check if user exists first to provide better error
+        const existingUser = await prisma.user.findUnique({
+            where: { id: session.user.id }
+        });
+        if (!existingUser) {
+            return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+        }
+
         const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
             data: updateData
@@ -43,6 +51,13 @@ export async function PATCH(request) {
         return NextResponse.json(updatedUser);
     } catch (error) {
         console.error("DEBUG: Profile Update Error:", error);
-        return NextResponse.json({ error: error.message || 'Failed to update profile' }, { status: 500 });
+        // Handle large payload explicitly if detectable, or Prisma errors
+        if (error.code === 'P2002') {
+            return NextResponse.json({ error: 'Database constraint violation (duplicate field)' }, { status: 400 });
+        }
+        return NextResponse.json({
+            error: error.message || 'Failed to update profile',
+            details: error.stack?.split('\n')[0]
+        }, { status: 500 });
     }
 }

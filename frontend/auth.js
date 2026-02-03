@@ -15,6 +15,8 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     providers: [
         Credentials({
             async authorize(credentials) {
+                console.error("!!! AUTH TRIGGERED !!!");
+                console.error("Credentials received:", JSON.stringify(credentials));
                 try {
                     const parsedCredentials = loginSchema.safeParse(credentials);
 
@@ -22,6 +24,8 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                         const { emailOrId, password } = parsedCredentials.data;
                         const trimmedInput = emailOrId.trim();
                         const lowerInput = trimmedInput.toLowerCase();
+
+                        console.log(`[AUTH] Attempting login for: "${emailOrId}"`);
 
                         // Try finding user by Email (case insensitive) OR ID/Path (original)
                         const user = await prisma.user.findFirst({
@@ -36,24 +40,25 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                         });
 
                         if (!user) {
-                            console.log(`[AUTH] ❌ User NOT FOUND for: "${emailOrId}"`);
+                            console.log(`[AUTH] ❌ FAIL: User NOT FOUND for: "${emailOrId}" in DB: ${process.env.DATABASE_URL.substring(0, 30)}...`);
                             return null;
                         }
 
-                        console.log(`[AUTH] 🔍 User FOUND: ${user.email} (Role: ${user.role}, ID: ${user.id})`);
+                        console.log(`[AUTH] 🔍 OK: User FOUND - ${user.email} (ID: ${user.id})`);
 
                         const passwordsMatch = await bcrypt.compare(password, user.password);
                         if (passwordsMatch) {
-                            console.log(`[AUTH] ✅ Password MATCH for: ${user.email}`);
+                            console.log(`[AUTH] ✅ SUCCESS: Password MATCH for: ${user.email}`);
                             return user;
                         } else {
-                            console.log(`[AUTH] ❌ Password MISMATCH for: ${user.email}`);
+                            console.log(`[AUTH] ❌ FAIL: Password MISMATCH for: ${user.email}`);
+                            console.log(`[AUTH] Debug: Input password length: ${password.length}, DB password hash starts with: ${user.password.substring(0, 10)}`);
                         }
                     } else {
-                        console.log("[AUTH] Invalid input format:", parsedCredentials.error.format());
+                        console.log("[AUTH] ❌ FAIL: Invalid input format:", parsedCredentials.error.format());
                     }
                 } catch (e) {
-                    console.error("[AUTH] Fatal Error:", e);
+                    console.error("[AUTH] ‼️ FATAL ERROR in authorize:", e);
                 }
                 return null;
             },
@@ -62,4 +67,5 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     session: { strategy: 'jwt' },
     secret: process.env.AUTH_SECRET || "DrKalsSuperSecretKey2026_FALLBACK",
     trustHost: true,
+    debug: true,
 });
