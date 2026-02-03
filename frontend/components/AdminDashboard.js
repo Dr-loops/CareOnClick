@@ -512,15 +512,26 @@ export default function AdminDashboard({ user }) {
                             </div>
                         </div>
 
-                        <button
-                            onClick={exportData}
-                            style={{
-                                padding: '12px 24px', background: '#ecfccb', color: '#365314', border: '1px solid #d9f99d',
-                                borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-                            }}
-                        >
-                            📥 Export Data
-                        </button>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => setActiveTab('security')}
+                                style={{
+                                    padding: '12px 24px', background: '#f8fafc', color: '#1e293b', border: '1px solid #e2e8f0',
+                                    borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                                }}
+                            >
+                                🔒 Change Password
+                            </button>
+                            <button
+                                onClick={exportData}
+                                style={{
+                                    padding: '12px 24px', background: '#ecfccb', color: '#365314', border: '1px solid #d9f99d',
+                                    borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                                }}
+                            >
+                                📥 Export Data
+                            </button>
+                        </div>
                     </div>
 
                     {/* --- TABS --- */}
@@ -529,6 +540,7 @@ export default function AdminDashboard({ user }) {
                             padding: '12px', borderRadius: '12px', border: 'none', background: activeTab === 'overview' ? colors.primary : colors.white,
                             color: activeTab === 'overview' ? 'white' : colors.textLight, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px ' + colors.border
                         }}>📊</button>
+                        <TabButton id="security" label="Security" icon="🔒" />
                         <TabButton id="analytics" label="Analytics" icon="📈" />
                         <TabButton id="patients" label="Patients" icon="👥" />
                         <TabButton id="appointments" label="Bookings" icon="📅" />
@@ -539,7 +551,6 @@ export default function AdminDashboard({ user }) {
                         <TabButton id="communication" label="Communication" icon="💬" />
                         <TabButton id="mailbox" label="Inbox" icon="📥" />
                         <TabButton id="site-editor" label="Site" icon="⚙️" />
-                        <TabButton id="security" label="Security" icon="🔒" />
                     </div>
                 </div>
             </header>
@@ -556,7 +567,24 @@ export default function AdminDashboard({ user }) {
                         </div>
 
                         {/* HUGE CARDS ROW */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '32px', marginBottom: '48px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', marginBottom: '48px' }}>
+
+                            {/* Card 0: Security (New for visibility) */}
+                            <div
+                                onClick={() => setActiveTab('security')}
+                                style={{
+                                    ...largeCardStyle,
+                                    background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                                    border: '1px solid #fed7aa', color: '#9a3412',
+                                    flex: 1
+                                }}
+                            >
+                                <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', opacity: 0.8 }}>Admin Security</h3>
+                                <div style={{ fontSize: '3rem', margin: '16px 0' }}>🔐</div>
+                                <div style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.8)', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                    CHANGE PASSWORD →
+                                </div>
+                            </div>
 
                             {/* Card 1: Patients */}
                             <div
