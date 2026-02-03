@@ -148,18 +148,18 @@ export async function POST(request) {
 
                         // 2. Send SMS
                         if (patient.phoneNumber) {
-                            await notificationService.sendSMS(patient.phoneNumber, `Dr. Kal's Hospital: ${msgBody}`);
+                            await notificationService.sendSMS(patient.phoneNumber, `CareOnClick: ${msgBody}`);
                         }
 
                         // 3. Send Email
                         if (patient.email) {
                             await notificationService.sendEmail(
                                 patient.email,
-                                "Appointment Confirmation - Dr. Kal's Virtual Hospital",
+                                "Appointment Confirmation - CareOnClick",
                                 msgBody,
                                 `
                                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                                    <h2 style="color: #0369a1;">Appointment Confirmed via Dr. Kal's Virtual Hospital</h2>
+                                    <h2 style="color: #0369a1;">Appointment Confirmed via CareOnClick</h2>
                                     <p>Dear ${patient.name},</p>
                                     <p>Your appointment has been successfully booked.</p>
                                     <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">

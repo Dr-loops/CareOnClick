@@ -90,7 +90,7 @@ export async function POST(request) {
             const sender = await prisma.user.findUnique({ where: { id: senderId } });
             if (sender) resolvedSenderName = sender.name;
         }
-        resolvedSenderName = resolvedSenderName || 'Dr. Kal Team';
+        resolvedSenderName = resolvedSenderName || 'CareOnClick Team';
 
         // 2. Fetch Recipient for Notification Details
         const recipient = await prisma.user.findUnique({ where: { id: recipientId } });

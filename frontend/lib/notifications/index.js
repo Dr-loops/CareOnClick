@@ -92,7 +92,7 @@ class NotificationService {
                     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
                 });
                 await transporter.sendMail({
-                    from: `"${process.env.EMAIL_FROM_NAME || "Dr. Kal's Hospital"}" <${process.env.EMAIL_USER}>`,
+                    from: `"${process.env.EMAIL_FROM_NAME || "CareOnClick"}" <${process.env.EMAIL_USER}>`,
                     to, subject, text, html: html || text
                 });
                 const msg = `[EMAIL-REAL] (Nodemailer) Sent to ${to}`;

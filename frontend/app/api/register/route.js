@@ -107,14 +107,14 @@ export async function POST(request) {
         // --- NOTIFICATIONS ---
         try {
             // Welcome Email
-            const emailSubject = `Welcome to Dr. Kal's Virtual Hospital!`;
+            const emailSubject = `Welcome to CareOnClick!`;
             const emailHtml = `
                 <h1>Welcome, ${name}!</h1>
-                <p>Thank you for registering at Dr. Kal's Virtual Hospital.</p>
+                <p>Thank you for registering at CareOnClick.</p>
                 <p>Your Member ID is: <strong>${newUser.id}</strong></p>
                 <p>You can now login to access our services.</p>
                 <br>
-                <p>Best regards,<br>The Dr. Kal Team</p>
+                <p>Best regards,<br>The CareOnClick Team</p>
             `;
             await notificationService.sendEmail(email, emailSubject, `Welcome ${name}!`, emailHtml);
 
@@ -122,7 +122,7 @@ export async function POST(request) {
             if (newUser.phoneNumber) {
                 await notificationService.sendSMS(
                     newUser.phoneNumber,
-                    `Welcome to Dr. Kal's Hospital! Your account (${newUser.id}) is ready.`
+                    `Welcome to CareOnClick! Your account (${newUser.id}) is ready.`
                 );
             }
         } catch (noteError) {
