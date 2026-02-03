@@ -58,15 +58,15 @@ export default function Footer() {
                         <ul className="contact-list">
                             <li>
                                 <Mail size={16} />
-                                <span>support@careonclick.com</span>
+                                <span>drkalsvirtualhospital@gmail.com</span>
                             </li>
                             <li>
                                 <Phone size={16} />
-                                <span>+233 54 050 9530</span>
+                                <span>+233 59 544 1825</span>
                             </li>
                             <li>
                                 <MapPin size={16} />
-                                <span>Virtual Hospital, Global</span>
+                                <span>Tamale, Ghana</span>
                             </li>
                         </ul>
                     </div>
