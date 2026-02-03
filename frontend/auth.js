@@ -15,33 +15,25 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     providers: [
         Credentials({
             async authorize(credentials) {
-                const parsedCredentials = loginSchema.safeParse(credentials);
+                try {
+                    const parsedCredentials = loginSchema.safeParse(credentials);
 
-                if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data;
-                    console.log("Server Login Attempt:", email);
+                    if (parsedCredentials.success) {
+                        const { email, password } = parsedCredentials.data;
+                        const user = await prisma.user.findUnique({ where: { email } });
+                        if (!user) return null;
 
-                    const user = await prisma.user.findUnique({ where: { email } });
-                    if (!user) {
-                        console.log("User not found in DB:", email);
-                        return null;
+                        const passwordsMatch = await bcrypt.compare(password, user.password);
+                        if (passwordsMatch) return user;
                     }
-
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
-                    if (passwordsMatch) {
-                        console.log("Password match! Login success for:", email);
-                        return user;
-                    } else {
-                        console.log("Password mismatch for:", email);
-                    }
-                } else {
-                    console.log("Invalid credentials schema");
+                } catch (e) {
+                    console.error("Auth Error:", e);
                 }
                 return null;
             },
         }),
     ],
     session: { strategy: 'jwt' },
-    secret: process.env.AUTH_SECRET,
+    secret: process.env.AUTH_SECRET || "DrKalsSuperSecretKey2026_FALLBACK",
     trustHost: true,
 });
