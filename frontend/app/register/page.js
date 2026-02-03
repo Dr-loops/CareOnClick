@@ -6,6 +6,7 @@ import { ROLES } from '@/lib/auth_constants';
 import { ALL_COUNTRIES, getRegions, getCountryCode } from '@/lib/location_data';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { Input } from '@/components/ui/Input';
 
 function RegisterForm() {
     const { register } = useAuth();
@@ -123,7 +124,7 @@ function RegisterForm() {
                     {isAdmin && (
                         <div style={{ marginBottom: '1.5rem', background: '#fefce8', padding: '1rem', borderRadius: '8px', border: '1px solid #fde047' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#854d0e' }}>🔑 Admin Secret Key</label>
-                            <input name="adminSecret" type="password" placeholder="Enter System Security Code" className="input-field" required onChange={handleChange} style={{ borderColor: '#fde047' }} suppressHydrationWarning />
+                            <Input name="adminSecret" type="password" placeholder="Enter System Security Code" className="input-field" required onChange={handleChange} style={{ borderColor: '#fde047' }} suppressHydrationWarning fullWidth />
                             <p style={{ fontSize: '0.8rem', color: '#a16207', marginTop: '0.5rem' }}>Restricted access. This key is required to create an admin account.</p>
                         </div>
                     )}
@@ -248,12 +249,12 @@ function RegisterForm() {
 
                     <div style={{ marginBottom: '1rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Password</label>
-                        <input name="password" type="password" className="input-field" required onChange={handleChange} suppressHydrationWarning />
+                        <Input name="password" type="password" className="input-field" required onChange={handleChange} suppressHydrationWarning fullWidth />
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Confirm Password</label>
-                        <input name="confirmPassword" type="password" className="input-field" required onChange={handleChange} suppressHydrationWarning />
+                        <Input name="confirmPassword" type="password" className="input-field" required onChange={handleChange} suppressHydrationWarning fullWidth />
                     </div>
 
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }} suppressHydrationWarning>
