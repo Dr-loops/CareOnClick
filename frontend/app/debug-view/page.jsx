@@ -6,54 +6,60 @@ export default async function DebugPage() {
     let dbStatus = 'Checking...';
     let adminFound = 'Checking...';
     let userCount = 0;
+    let dbHost = 'Unknown';
 
     try {
-        const users = await prisma.user.findMany({ take: 3 });
-        userCount = await prisma.user.count();
+        const count = await prisma.user.count();
+        userCount = count;
         dbStatus = '✅ Connected';
 
         const admin = await prisma.user.findUnique({
             where: { email: 'drkalsvirtualhospital@gmail.com' }
         });
         adminFound = admin ? `✅ Found (Role: ${admin.role})` : '❌ NOT FOUND';
+
+        // Try to identify the DB host from the connection
+        const dbUrl = process.env.DATABASE_URL || '';
+        if (dbUrl.includes('neon.tech')) dbHost = 'Neon';
+        else if (dbUrl.includes('supabase.co')) dbHost = 'Supabase';
+        else dbHost = 'Other/Unknown';
+
     } catch (e) {
         dbStatus = `❌ Error: ${e.message}`;
-        adminFound = '❌ Error';
     }
 
     const vars = {
         DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
-        ADMIN_SECRET_KEY: process.env.ADMIN_SECRET_KEY ? 'PRESENT' : 'MISSING',
         AUTH_SECRET: process.env.AUTH_SECRET ? 'PRESENT' : 'MISSING',
-        AUTH_URL: process.env.AUTH_URL || 'NOT SET',
         AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST || 'NOT SET',
         NODE_ENV: process.env.NODE_ENV,
     };
 
     return (
         <div style={{ padding: '2rem', fontFamily: 'monospace', maxWidth: '800px', margin: '0 auto' }}>
-            <h1>Deep Production Debugger</h1>
+            <h1>Neon Production Debugger</h1>
 
-            <section style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
-                <h2>1. Database Connectivity</h2>
+            <section style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem', borderRadius: '8px' }}>
+                <h2>1. Database Connection</h2>
                 <p>Status: <strong>{dbStatus}</strong></p>
-                <p>Total Users: <strong>{userCount}</strong></p>
-                <p>Admin Search: <strong>{adminFound}</strong></p>
+                <p>Database Platform: <strong>{dbHost}</strong></p>
+                <p>Total Users in DB: <strong>{userCount}</strong></p>
+                <p>Admin User Check: <strong>{adminFound}</strong></p>
             </section>
 
-            <section style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
-                <h2>2. Environment Variables</h2>
+            <section style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem', borderRadius: '8px' }}>
+                <h2>2. Environment Status</h2>
                 <pre>{JSON.stringify(vars, null, 2)}</pre>
             </section>
 
-            <section style={{ padding: '1rem', background: '#fff4e5', borderLeft: '5px solid #ffa117' }}>
-                <h3>Next Steps for "CredentialsSignin" Error:</h3>
+            <div style={{ padding: '1rem', background: '#f0f9ff', borderLeft: '5px solid #0070f3', borderRadius: '4px' }}>
+                <h3>Final Troubleshooting:</h3>
                 <ul>
-                    <li>If <b>AUTH_TRUST_HOST</b> is not "true", add <code>AUTH_TRUST_HOST=true</code> to Vercel.</li>
-                    <li>If <b>AUTH_SECRET</b> length is less than 32 chars, consider generating a stronger one.</li>
-                    <li>Ensure <b>AUTH_URL</b> matches your production domain (e.g., <code>https://your-app.vercel.app</code>).</li>
+                    <li>If it says <b>Supabase</b> but you want <b>Neon</b>: You MUST update the URL in Vercel. Pushing <code>.env</code> to GitHub <b>doesn't</b> change Vercel.</li>
+                    <li>If <b>dbStatus</b> is an Error: Your password or host in Vercel is wrong.</li>
+                    <li>If <b>adminFound</b> is ❌ NOT FOUND: You are connected to an empty database.</li>
                 </ul>
-            </section>
+            </div>
         </div>
     );
 }

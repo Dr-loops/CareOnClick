@@ -2,19 +2,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
-import { ROLES } from '@/lib/auth_constants';
+import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, ChevronLeft } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
 
 const VideoConsultation = ({ roomId, patientId, user }) => {
-    // Backwards compatibility: use roomId or patientId
     const targetRoomId = roomId || patientId;
-
     const router = useRouter();
+
     const [stream, setStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
     const [callStatus, setCallStatus] = useState('idle'); // idle, calling, incoming, connected, ended
     const [otherUser, setOtherUser] = useState(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
 
     const myVideo = useRef();
     const userVideo = useRef();
@@ -22,16 +22,11 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
     const socketRef = useRef();
 
     useEffect(() => {
-        // Initialize Socket
         const socket = getSocket();
         if (!socket) return;
-
         socketRef.current = socket;
-
-        // Join the specific video room (e.g. PatientID or ProfessionalID)
         socket.emit('join_room', targetRoomId);
 
-        // Get Local Stream
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then((currentStream) => {
                 setStream(currentStream);
@@ -41,25 +36,18 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
             })
             .catch(err => {
                 console.error("Error accessing media devices:", err);
-                alert("Could not access camera/microphone");
+                alert("Could not access camera/microphone. Please ensure permissions are granted.");
             });
 
-        // Socket Events
         socket.on('call-made', (data) => {
-            // Incoming call
             setOtherUser({ id: data.from, name: data.name });
             setCallStatus('incoming');
             connectionRef.current = createPeerConnection(data.from);
-
-            // Handle Offer
-            const rtcSessionDescription = new RTCSessionDescription(data.signal);
-            connectionRef.current.setRemoteDescription(rtcSessionDescription);
+            connectionRef.current.setRemoteDescription(new RTCSessionDescription(data.signal));
         });
 
         socket.on('answer-made', async (data) => {
-            // Call answered
-            const rtcSessionDescription = new RTCSessionDescription(data.signal);
-            await connectionRef.current.setRemoteDescription(rtcSessionDescription);
+            await connectionRef.current.setRemoteDescription(new RTCSessionDescription(data.signal));
             setCallStatus('connected');
         });
 
@@ -70,28 +58,24 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
         });
 
         return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            if (connectionRef.current) {
-                connectionRef.current.close();
-            }
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (connectionRef.current) connectionRef.current.close();
         };
     }, [targetRoomId]);
 
     const createPeerConnection = (partnerId) => {
         const peer = new RTCPeerConnection({
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }, // Free STUN server
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
             ]
         });
 
-        // Add Tracks
         if (stream) {
             stream.getTracks().forEach(track => peer.addTrack(track, stream));
         }
 
-        // Handle Ice Candidates
         peer.onicecandidate = (event) => {
             if (event.candidate) {
                 socketRef.current.emit('ice-candidate', {
@@ -101,7 +85,6 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
             }
         };
 
-        // Handle Remote Stream
         peer.ontrack = (event) => {
             setRemoteStream(event.streams[0]);
             if (userVideo.current) {
@@ -113,9 +96,7 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
     };
 
     const callUser = async () => {
-        const peer = createPeerConnection(targetRoomId); // Find peer by ID? 
-        // Note: targetRoomId is the 'id' of the user we want to call (or room they are in). 
-        // We broadcast to them.
+        const peer = createPeerConnection(targetRoomId);
         connectionRef.current = peer;
 
         const offer = await peer.createOffer();
@@ -131,74 +112,136 @@ const VideoConsultation = ({ roomId, patientId, user }) => {
     };
 
     const answerCall = async () => {
-        const peer = connectionRef.current; // Created in 'call-made' event
-
+        const peer = connectionRef.current;
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(answer);
-
         setCallStatus('connected');
-
         socketRef.current.emit('make-answer', {
             signal: answer,
             to: otherUser.id
         });
     };
 
+    const toggleMute = () => {
+        if (stream) {
+            stream.getAudioTracks().forEach(track => track.enabled = !track.enabled);
+            setIsMuted(!isMuted);
+        }
+    };
+
+    const toggleVideo = () => {
+        if (stream) {
+            stream.getVideoTracks().forEach(track => track.enabled = !track.enabled);
+            setIsVideoOff(!isVideoOff);
+        }
+    };
+
     const leaveCall = () => {
         setCallStatus('ended');
-        if (connectionRef.current) {
-            connectionRef.current.close();
-        }
-        router.push('/dashboard');
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        if (connectionRef.current) connectionRef.current.close();
+        router.back();
     };
 
     return (
-        <div className="video-consultation-container p-4 h-full flex flex-col items-center justify-center bg-slate-900 text-white min-h-screen">
-            <div className="absolute top-4 left-4 z-10">
-                <Button variant="secondary" onClick={() => router.back()}>Back</Button>
+        <div className="relative h-[100dvh] w-full bg-slate-950 overflow-hidden flex flex-col font-sans">
+            {/* Header / Back Button */}
+            <div className="absolute top-0 left-0 right-0 p-4 z-50 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+                <button
+                    onClick={() => router.back()}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors pointer-events-auto"
+                >
+                    <ChevronLeft className="w-6 h-6 text-white" />
+                </button>
+                <div className="text-white font-medium text-sm drop-shadow-lg">
+                    {callStatus === 'connected' ? `In call with ${otherUser?.name || 'Patient'}` : 'Video Consultation'}
+                </div>
+                <div className="w-10" /> {/* Spacer */}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-6xl flex-grow items-center">
-                {/* My Video */}
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-slate-700">
-                    <video playsInline muted ref={myVideo} autoPlay className="w-full h-full object-cover" />
-                    <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-1 rounded text-sm">
-                        You ({user?.name})
-                    </div>
-                </div>
-
-                {/* Remote Video */}
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 flex items-center justify-center">
-                    {remoteStream ? (
-                        <video playsInline ref={userVideo} autoPlay className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="text-center p-4">
-                            <div className="text-4xl mb-4">👤</div>
-                            <p className="text-xl">
-                                {callStatus === 'calling' ? 'Calling...' : (callStatus === 'incoming' ? `${otherUser?.name} is calling...` : 'Waiting for connection')}
-                            </p>
+            {/* Remote Video (Full Screen) */}
+            <div className="absolute inset-0 z-0 bg-slate-900 flex items-center justify-center">
+                {remoteStream ? (
+                    <video playsInline ref={userVideo} autoPlay className="w-full h-full object-cover" />
+                ) : (
+                    <div className="flex flex-col items-center">
+                        <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 border-2 border-slate-700 animate-pulse">
+                            <span className="text-4xl text-slate-500">👤</span>
                         </div>
-                    )}
-                    {callStatus === 'connected' && <div className="absolute bottom-2 left-2 bg-black/50 px-2 py-1 rounded text-sm">Remote User</div>}
+                        <p className="text-slate-400 font-medium">
+                            {callStatus === 'calling' ? 'Calling...' :
+                                callStatus === 'incoming' ? `${otherUser?.name} is calling...` :
+                                    'Waiting for participant...'}
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {/* My Video (Floating Box) */}
+            <div className={`absolute top-20 right-4 z-30 w-32 md:w-48 aspect-[3/4] bg-slate-800 rounded-xl overflow-hidden shadow-2xl border-2 border-white/10 transition-all duration-500 ${callStatus === 'idle' ? 'scale-150 top-1/2 right-1/2 translate-x-1/2 -translate-y-1/2' : ''}`}>
+                <video playsInline muted ref={myVideo} autoPlay className="w-full h-full object-cover" />
+                {isVideoOff && (
+                    <div className="absolute inset-0 bg-slate-900 flex items-center justify-center">
+                        <VideoOff className="w-8 h-8 text-slate-600" />
+                    </div>
+                )}
+                <div className="absolute bottom-2 left-2 text-[10px] bg-black/40 px-1.5 py-0.5 rounded text-white font-medium backdrop-blur-md">
+                    You
                 </div>
             </div>
 
-            {/* Controls */}
-            <div className="mt-8 flex gap-6">
-                {callStatus === 'idle' && (
-                    <Button variant="success" size="lg" onClick={callUser} className="px-8 py-4 rounded-full text-lg shadow-lg shadow-green-500/30">
-                        📞 Start Call
-                    </Button>
-                )}
+            {/* Controls Bar */}
+            <div className="absolute bottom-0 left-0 right-0 p-8 z-50 flex flex-col items-center">
                 {callStatus === 'incoming' && (
-                    <Button variant="success" size="lg" onClick={answerCall} className="px-8 py-4 rounded-full text-lg animate-pulse">
-                        Answer
-                    </Button>
+                    <div className="mb-8 animate-bounce">
+                        <Button variant="success" size="lg" onClick={answerCall} className="rounded-full px-10 py-6 scale-110 shadow-2xl shadow-green-500/50">
+                            Answer Call
+                        </Button>
+                    </div>
                 )}
-                <Button variant="danger" size="lg" onClick={leaveCall} className="px-8 py-4 rounded-full text-lg shadow-lg shadow-red-500/30">
-                    End Call
-                </Button>
+
+                <div className="flex items-center gap-4 bg-black/40 backdrop-blur-xl p-4 rounded-3xl border border-white/10 shadow-2xl">
+                    {callStatus === 'idle' ? (
+                        <button
+                            onClick={callUser}
+                            className="w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg shadow-green-500/20"
+                        >
+                            <VideoIcon className="w-7 h-7 text-white" />
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                onClick={toggleMute}
+                                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            >
+                                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                            </button>
+
+                            <button
+                                onClick={leaveCall}
+                                className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg shadow-red-500/40"
+                            >
+                                <PhoneOff className="w-8 h-8 text-white" />
+                            </button>
+
+                            <button
+                                onClick={toggleVideo}
+                                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            >
+                                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <VideoIcon className="w-6 h-6" />}
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
+
+            {/* CSS Overrides for smooth video */}
+            <style jsx>{`
+                video {
+                    transform: rotateY(180deg);
+                    -webkit-transform: rotateY(180deg);
+                }
+            `}</style>
         </div>
     );
 };
