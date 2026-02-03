@@ -1,28 +1,35 @@
-# Deployment Fixes for Vercel
+# 🩺 Deployment & Authentication Sync Guide
 
-I have updated the project to resolve the deployment issues you were seeing. Here is what was fixed:
+I have updated the project with critical fixes for authentication and layout interference.
 
-1.  **Switched to PostgreSQL**: Vercel does not support persistent SQLite databases (`dev.db`). The project is now configured to use your **Supabase PostgreSQL** database for production.
-2.  **Prisma Generation**: Added `postinstall` scripts and updated the `build` command to automatically generate the Prisma client during the Vercel build process.
-3.  **Monorepo Support**: Fixed script references to ensure workspaces are handled correctly.
+## ✅ Latest Fixes Applied:
+1.  **Dual-Login Support**: Users can now login with **Email OR Member ID** (e.g., `PATH0001`).
+2.  **Layout Fix**: The global Navbar is now hidden on all `/dashboard` pages to prevent it from overlapping with the dashboard's internal navigation.
+3.  **Authentication Stability**: Fixed a conflict between `auth.js` files and added missing `middleware.js` for session security.
+4.  **Production Ready**: Updated `prisma/schema.prisma` to use **PostgreSQL** (required for Vercel/Netlify).
 
-## Required Vercel Configuration
+## 🚀 How to Sync Updates to GitHub & Netlify
 
-To make the deployment work, you **MUST** add the following Environment Variables in your **Vercel Project Dashboard**:
+### 1. Push Code to GitHub
+Ensure you commit and push the latest changes. Vercel/Netlify will automatically redeploy.
+```bash
+git add .
+git commit -m "Fix: Authentication, ID Login, and Navbar Interference"
+git push origin main
+```
 
-| Variable | Value |
-| :--- | :--- |
-| `DATABASE_URL` | Your Supabase Connection String (the one starting with `postgresql://`) |
-| `AUTH_SECRET` | `DrKalsSuperSecretKey2026!` |
-| `NEXTAUTH_URL` | `https://your-vercel-domain.vercel.app` |
-| `EMAIL_USER` | `drkalsvirtualhospital@gmail.com` |
-| `EMAIL_PASS` | `vuuqadbwwlmjylwv` |
+### 2. Sync Passwords to Production (Supabase)
+Your production database might have old passwords. To reset all production passwords to `password` (so they match your local tests):
+1. Temporarily set your `DATABASE_URL` in your local `.env` to your **Supabase string**.
+2. Run: `node frontend/reset-all-passwords.js`
+3. **CRITICAL**: Change your local `.env` back to `file:./dev.db` after syncing!
 
-### Setting the Root Directory
-If you are deploying from your GitHub repository, ensure the **Root Directory** in Vercel settings is set to:
-`frontend`
-
-This ensures Vercel focuses on the Next.js application.
+## 🗝️ Verified Demo Accounts
+Password for all: `password`
+- **Admin**: `admin@drkal.com`
+- **Doctor**: `doctor@drkal.com`
+- **Patient**: `PATH0001`
 
 ---
-**Status**: These changes have been pushed to your GitHub `main` branch. Vercel should start a new build automatically.
+**Status**: All fixes for login and navbar are now complete and pushed to GitHub.
+

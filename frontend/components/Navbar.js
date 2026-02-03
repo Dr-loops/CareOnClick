@@ -1,53 +1,111 @@
 "use client";
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Menu, X, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 
 export default function Navbar() {
     const pathname = usePathname();
     const { user, logout } = useAuth();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [scrolled, setScrolled] = useState(false);
 
-    // This will be dynamic based on Auth state
     const isLoggedIn = !!user;
 
+    useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Close menu when route changes
+    useEffect(() => setIsMenuOpen(false), [pathname]);
+
+    // [NEW] Hide global Navbar on Dashboard pages to prevent interference
+    if (pathname.startsWith('/dashboard')) return null;
+
     return (
-        <nav style={{
-            background: 'white',
-            borderBottom: '1px solid var(--border-color)',
-            padding: '1rem 0'
-        }}>
+        <nav className={`main-nav ${scrolled ? 'scrolled' : ''}`}>
             <div className="container nav-container">
-                <Link href="/" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-sea-blue)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <img src="/logo.png" alt="Dr Kal Logo" style={{ height: '80px' }} />
-                    <span>Dr Kal's</span>
+                {/* Logo Section */}
+                <Link href="/" className="nav-logo">
+                    <img src="/logo.png" alt="Dr Kal Logo" />
+                    <span className="text-gradient">Dr Kal&apos;s</span>
                 </Link>
 
-                <div className="nav-links" style={{ display: 'flex', gap: '2rem', alignItems: 'center', width: '100%' }}>
-                    {/* Main Nav Links - Left Aligned */}
-                    <div style={{ display: 'flex', gap: '2rem' }}>
-                        <Link href="/" style={{ color: pathname === '/' ? 'var(--color-navy)' : 'var(--text-secondary)', fontWeight: pathname === '/' ? 'bold' : 'normal' }}>Home</Link>
-                        <Link href="/services" style={{ color: pathname === '/services' ? 'var(--color-navy)' : 'var(--text-secondary)', fontWeight: pathname === '/services' ? 'bold' : 'normal' }}>Services</Link>
-                        <Link href="/about" style={{ color: pathname === '/about' ? 'var(--color-navy)' : 'var(--text-secondary)', fontWeight: pathname === '/about' ? 'bold' : 'normal' }}>About</Link>
-                        <Link href="/vision" style={{ color: pathname === '/vision' ? 'var(--color-navy)' : 'var(--text-secondary)', fontWeight: pathname === '/vision' ? 'bold' : 'normal' }}>Vision</Link>
-                        <Link href="/mission" style={{ color: pathname === '/mission' ? 'var(--color-navy)' : 'var(--text-secondary)', fontWeight: pathname === '/mission' ? 'bold' : 'normal' }}>Mission</Link>
+                {/* Desktop Nav Links */}
+                <div className="nav-links-desktop">
+                    <Link href="/" className={pathname === '/' ? 'active' : ''}>Home</Link>
+                    <Link href="/services" className={pathname === '/services' ? 'active' : ''}>Services</Link>
+                    <Link href="/about" className={pathname === '/about' ? 'active' : ''}>About</Link>
+                    <Link href="/vision" className={pathname === '/vision' ? 'active' : ''}>Vision</Link>
+                    <Link href="/mission" className={pathname === '/mission' ? 'active' : ''}>Mission</Link>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="nav-actions">
+                    <Link href="https://wa.me/233540509530" target="_blank" className="btn btn-secondary hide-on-mobile">
+                        <MessageCircle size={18} />
+                        Help Center
+                    </Link>
+
+                    {isLoggedIn ? (
+                        <div className="nav-user-controls">
+                            <Link href="/dashboard" className="btn btn-primary btn-sm">Dashboard</Link>
+                            <button onClick={logout} className="btn-icon text-error-dark" title="Logout">
+                                <LogOut size={20} />
+                            </button>
+                        </div>
+                    ) : (
+                        <Link href="/login" className="btn btn-primary hide-on-mobile">Log In</Link>
+                    )}
+
+                    {/* Mobile Menu Toggle */}
+                    <button className="mobile-menu-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                        {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    </button>
+                </div>
+            </div>
+
+            {/* Mobile Sidebar Menu */}
+            <div className={`mobile-menu-overlay ${isMenuOpen ? 'open' : ''}`} onClick={() => setIsMenuOpen(false)}>
+                <div className="mobile-menu-content" onClick={e => e.stopPropagation()}>
+                    <div className="mobile-menu-header">
+                        <img src="/logo.png" alt="Logo" />
+                        <span className="text-gradient">Dr Kal&apos;s</span>
+                        <button onClick={() => setIsMenuOpen(false)}><X /></button>
                     </div>
 
-                    {/* Action Buttons - Right Aligned via Auto Margin */}
-                    <div style={{ display: 'flex', gap: '1.5rem', marginLeft: 'auto', alignItems: 'center' }}>
-                        <Link href="https://wa.me/233595441825" target="_blank" className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}>
-                            <MessageCircle size={18} />
-                            Help
+                    <div className="mobile-menu-links">
+                        <Link href="/" className={pathname === '/' ? 'active' : ''}>
+                            Home <ChevronRight size={16} />
                         </Link>
-                        {isLoggedIn ? (
-                            <button onClick={logout} className="btn btn-primary" style={{ padding: '0.5rem 1.5rem', background: '#dc2626', borderColor: '#dc2626' }}>Log Out</button>
+                        <Link href="/services" className={pathname === '/services' ? 'active' : ''}>
+                            Services <ChevronRight size={16} />
+                        </Link>
+                        <Link href="/about" className={pathname === '/about' ? 'active' : ''}>
+                            About <ChevronRight size={16} />
+                        </Link>
+                        <Link href="/vision" className={pathname === '/vision' ? 'active' : ''}>
+                            Vision <ChevronRight size={16} />
+                        </Link>
+                        <Link href="/mission" className={pathname === '/mission' ? 'active' : ''}>
+                            Mission <ChevronRight size={16} />
+                        </Link>
+                        <hr />
+                        {!isLoggedIn ? (
+                            <Link href="/login" className="btn btn-primary" style={{ marginTop: '1rem', width: '100%' }}>Login / Register</Link>
                         ) : (
-                            <Link href="/login" className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }}>Log In</Link>
+                            <button onClick={logout} className="btn btn-danger" style={{ marginTop: '1rem', width: '100%' }}>Logout</button>
                         )}
-                        <Link href="/login?role=admin" style={{ fontSize: '0.8rem', color: '#999' }}>Admin</Link>
+                        <Link href="https://wa.me/233540509530" target="_blank" className="mobile-help-link">
+                            <MessageCircle size={18} /> Need Help? Chat with us
+                        </Link>
                     </div>
                 </div>
             </div>
         </nav>
     );
 }
+

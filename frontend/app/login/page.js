@@ -129,8 +129,8 @@ export default function LoginPage() {
                     /* --- NORMAL LOGIN FORM --- */
                     <form onSubmit={handleSubmit}>
                         <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>Email Address</label>
-                            <input type="email" className="input-field" placeholder="your@email.com"
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>Email Address or Member ID</label>
+                            <input type="text" className="input-field" placeholder="your@email.com or PATH0001"
                                 value={email} onChange={(e) => setEmail(e.target.value)} required suppressHydrationWarning />
                         </div>
 

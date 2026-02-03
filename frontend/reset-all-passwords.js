@@ -9,16 +9,18 @@ async function main() {
 
         console.log(`🚀 Starting global password reset to: "${newPassword}"...`);
 
-        // Update all users in a single operation
-        const result = await prisma.user.updateMany({
-            data: {
-                password: hashedPassword
-            }
-        });
+        const users = await prisma.user.findMany();
+        console.log(`Found ${users.length} users.`);
 
-        console.log(`✅ Successfully reset passwords for ${result.count} users.`);
-        console.log(`📝 Users can now log in with their email and "${newPassword}".`);
-        console.log(`🛡️  The system remains flexible; they can change this anytime via their profile settings.`);
+        for (const user of users) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: hashedPassword }
+            });
+            console.log(`Updated: ${user.email} (${user.role})`);
+        }
+
+        console.log(`✅ Successfully reset all passwords.`);
 
     } catch (e) {
         console.error("❌ Global reset failed:", e);

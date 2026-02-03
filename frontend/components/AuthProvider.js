@@ -33,12 +33,12 @@ function AuthStateAdapter({ children }) {
         }
     }, [session, status]);
 
-    const login = async (email, password) => {
+    const login = async (emailOrId, password) => {
         try {
             console.log("Attempting login via NextAuth...");
             const result = await signIn("credentials", {
                 redirect: false,
-                email,
+                emailOrId,
                 password
             });
 
@@ -51,6 +51,7 @@ function AuthStateAdapter({ children }) {
 
             if (result?.ok) {
                 console.log("Login Successful, redirecting to /dashboard");
+                alert(`✅ LOGIN SUCCESS: Authenticated as ${emailOrId}`);
                 router.push('/dashboard');
                 router.refresh(); // Ensure strict refresh of session state
                 return { success: true };
