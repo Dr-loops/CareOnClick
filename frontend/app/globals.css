@@ -2175,6 +2175,14 @@ h6 {
 }
 
 @media (max-width: 768px) {
+  .main-nav {
+    position: absolute;
+    /* content scrolls away */
+    background: white;
+    /* solid background */
+    border-bottom: 1px solid var(--color-grey-200);
+  }
+
   .main-page {
     padding-top: 6rem;
   }
