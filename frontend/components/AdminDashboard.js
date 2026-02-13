@@ -675,7 +675,7 @@ export default function AdminDashboard({ user }) {
                                         <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{new Date(log.timestamp).toLocaleString()}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.action || 'ACCESS'}</td>
-                                            <td style={tdStyle}>{log.user || 'System'}</td>
+                                            <td style={tdStyle}>{log.actorName || log.user || 'System'}</td>
                                             <td style={tdStyle}>{log.details}</td>
                                         </tr>
                                     ))}

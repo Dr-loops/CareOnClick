@@ -13,7 +13,7 @@ import { ROLES } from '@/lib/auth_constants';
 import { LAB_TESTS } from '@/lib/lab_tests_data';
 import { CLINICAL_MODULES } from '@/lib/clinical_data';
 import { PHYSICIAN_TABS, AI_SUGGESTIONS, CLINICAL_ALERTS } from '@/lib/physician_data';
-import { saveGlobalRecord, updateAppointment, getGlobalData, performTriage, updatePatientVitals, KEYS } from '@/lib/global_sync';
+import { saveGlobalRecord, updateAppointment, getGlobalData, performTriage, updatePatientVitals, logAudit, KEYS } from '@/lib/global_sync';
 import { analyzeResult, REFERENCE_RANGES } from '@/lib/medical_analysis';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
 import { usePatients, useVitals, useTasks } from '@/lib/hooks/useClinicalData';
@@ -71,6 +71,16 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
 
             if (res.ok) {
                 alert(`Appointment ${action}ed successfully.`);
+
+                // [NEW] Audit Log
+                logAudit({
+                    actorName: professionalName || 'Professional',
+                    action: `${action.toUpperCase()}ED APPOINTMENT`,
+                    targetName: `Appointment ${id}`,
+                    details: `${action}ed request. Status: ${newStatus}`,
+                    notes: `Appointment ID: ${id}`
+                });
+
                 if (onRefresh) onRefresh();
             } else {
                 alert('Failed to update status.');
@@ -429,6 +439,15 @@ export default function ProfessionalDashboard({ user }) {
         if (selectedPatient) {
             setMedicationList(selectedPatient.meds || []);
             fetchPatientRecords();
+
+            // [NEW] Audit Log
+            logAudit({
+                actorName: user.name || 'Professional',
+                action: 'VIEWED PATIENT DASHBOARD',
+                targetName: selectedPatient.name,
+                details: `Viewed records for ${selectedPatient.name}`,
+                notes: `Patient ID: ${selectedPatient.id}`
+            });
         }
     }, [selectedPatientId]);
 
@@ -589,6 +608,15 @@ export default function ProfessionalDashboard({ user }) {
 
             try {
                 await saveGlobalRecord(newRecord);
+
+                // [NEW] Audit Log (Explicit)
+                logAudit({
+                    actorName: user.name || 'Professional',
+                    action: 'DISPATCHED RECORD',
+                    targetName: newRecord.fileName,
+                    details: `Dispatched ${activeTest ? 'structured' : 'file'} result for ${newRecord.pathNumber}`,
+                    notes: `Record Type: ${newRecord.unit}`
+                });
 
                 // [NEW] Attempt to mark active appointment as 'Services Rendered'
                 // We find the most recent 'In Progress' or 'Upcoming' appointment for this patient/prof
