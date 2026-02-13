@@ -119,8 +119,39 @@ export async function PUT(request) {
 
         const updatedAppointment = await prisma.appointment.update({
             where: { id },
-            data: { status }
+            data: { status },
+            include: { professional: true }
         });
+
+        // [NEW] Trigger Patient Alert on Status Change
+        if (status === 'Upcoming' || status === 'Cancelled') {
+            try {
+                const actionText = status === 'Upcoming' ? 'accepted' : 'cancelled';
+                const alertType = status === 'Upcoming' ? 'CHAT' : 'ALERT';
+                const content = status === 'Upcoming'
+                    ? `Your appointment with ${updatedAppointment.professionalName} on ${updatedAppointment.date.toLocaleDateString()} at ${updatedAppointment.time} has been accepted.`
+                    : `Your appointment with ${updatedAppointment.professionalName} on ${updatedAppointment.date.toLocaleDateString()} has been cancelled.`;
+
+                await prisma.message.create({
+                    data: {
+                        senderId: updatedAppointment.professionalId,
+                        senderName: updatedAppointment.professionalName,
+                        role: updatedAppointment.professional.role,
+                        recipientId: updatedAppointment.patientId,
+                        recipientName: updatedAppointment.patientName,
+                        type: alertType,
+                        content: content,
+                    }
+                });
+
+                // Also trigger real-time notification service if available
+                if (status === 'Cancelled') {
+                    await notificationService.sendSMS('SYSTEM', `Appointment ${id} ${actionText} for ${updatedAppointment.patientName}`);
+                }
+            } catch (notifyErr) {
+                console.error("Failed to create status notification message", notifyErr);
+            }
+        }
 
         return NextResponse.json(updatedAppointment);
 
