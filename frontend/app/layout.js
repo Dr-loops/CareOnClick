@@ -5,6 +5,7 @@ import DashboardNav from '../components/DashboardNav';
 import Footer from '../components/Footer';
 import { AuthProvider } from '@/components/AuthProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import NotificationManager from '@/components/NotificationManager';
 
 const montserrat = Montserrat({
     subsets: ['latin'],
@@ -38,6 +39,7 @@ export default function RootLayout({ children }) {
             <body className={`${openSans.variable} ${montserrat.variable}`} suppressHydrationWarning={true}>
                 <AuthProvider>
                     <Navbar />
+                    <NotificationManager />
                     <DashboardNav />
                     <main className="main-content">
                         <ErrorBoundary>

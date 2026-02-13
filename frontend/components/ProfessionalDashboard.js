@@ -72,6 +72,20 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
             if (res.ok) {
                 alert(`Appointment ${action}ed successfully.`);
 
+                // [NEW] Emit Real-time Socket Notification to Patient
+                const app = apiAppointments.find(a => a.id === id);
+                const socket = getSocket();
+                if (socket && app) {
+                    socket.emit('send_notification', {
+                        recipientId: app.patientId,
+                        type: action === 'Accept' ? 'APPOINTMENT_CONFIRMED' : 'APPOINTMENT_CANCELLED',
+                        title: action === 'Accept' ? 'Appointment Accepted' : 'Appointment Cancelled',
+                        message: action === 'Accept'
+                            ? `Your appointment with ${professionalName} on ${app.date} has been accepted.`
+                            : `Your appointment with ${professionalName} has been cancelled.`,
+                    });
+                }
+
                 // [NEW] Audit Log
                 logAudit({
                     actorName: professionalName || 'Professional',

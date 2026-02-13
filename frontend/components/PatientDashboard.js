@@ -190,6 +190,19 @@ export default function PatientDashboard({ user }) {
                 setToast({ message: 'Reply sent successfully!', type: 'success' });
                 setReplyContent('');
                 setReplyingTo(null);
+
+                // [NEW] Real-time Socket Notification to Professional
+                const socket = getSocket();
+                if (socket) {
+                    socket.emit('send_message', {
+                        recipientId: recipientId,
+                        senderId: user.id,
+                        senderName: profile.fullName || user.name,
+                        content: replyContent,
+                        type: 'CHAT'
+                    });
+                }
+
                 fetchMessages();
             } else {
                 setToast({ message: 'Failed to send reply', type: 'error' });

@@ -104,6 +104,20 @@ export default function CommunicationHub({
             if (data.success) {
                 alert(`Message sent via ${type}!`);
                 document.getElementById('comm-hub-msg-content').value = '';
+
+                // [NEW] Emit Real-time Socket Notification
+                const { getSocket } = require('@/lib/socket');
+                const socket = getSocket();
+                if (socket) {
+                    socket.emit('send_message', {
+                        recipientId: selectedTarget.id,
+                        senderId: user.id,
+                        senderName: user.name,
+                        content,
+                        type
+                    });
+                }
+
                 fetchMessages();
             } else {
                 alert('Failed: ' + data.error);

@@ -45,19 +45,43 @@ io.on('connection', (socket) => {
             // Notify the professional specifically
             io.to(data.professionalId).emit('notification', {
                 type: 'APPOINTMENT_PENDING',
-                title: 'New Appointment Request',
+                title: 'New Booking Request',
                 message: `New booking request from ${data.patientName || 'a patient'}`,
-                appointment: data
+                appointment: data,
+                timestamp: new Date().toISOString()
             });
             // Also refresh their dashboard data
             io.to(data.professionalId).emit('appointment_change', data);
         }
     });
 
+    // Generic Notification Handler (for Vitals, Records, Alerts, etc.)
+    socket.on('send_notification', (data) => {
+        console.log('Notification Request:', data);
+        const { recipientId, type, title, message, metadata } = data;
+        if (recipientId) {
+            io.to(recipientId).emit('notification', {
+                type: type || 'GENERAL',
+                title: title || 'New Update',
+                message: message || 'You have a new update.',
+                metadata: metadata || {},
+                timestamp: new Date().toISOString()
+            });
+        }
+    });
+
     // Handle Messages
     socket.on('send_message', (data) => {
-        if (data.patientId) {
-            io.to(data.patientId).emit('receive_message', data);
+        if (data.recipientId) {
+            io.to(data.recipientId).emit('receive_message', data);
+
+            // Also trigger a notification for the sound/alert UI
+            io.to(data.recipientId).emit('notification', {
+                type: 'CHAT',
+                title: `New message from ${data.senderName || 'Staff'}`,
+                message: data.content,
+                timestamp: new Date().toISOString()
+            });
         }
     });
 

@@ -227,6 +227,18 @@ export const saveGlobalRecord = async (record) => {
         }
     });
 
+    // [NEW] Real-time Socket Notification
+    const socket = getSocket();
+    if (socket) {
+        socket.emit('send_notification', {
+            recipientId: newRecord.pathNumber,
+            type: 'RECORD_UPLOADED',
+            title: 'New Medical Record',
+            message: `A new ${newRecord.unit} record has been uploaded by ${newRecord.scientist || 'Staff'}.`,
+            metadata: { recordId: newRecord.id }
+        });
+    }
+
     dispatchSync();
     return newRecord;
 };
@@ -242,6 +254,19 @@ export const updatePatientVitals = (pathNumber, vitals) => {
         lastUpdated: new Date().toISOString()
     };
     localStorage.setItem(KEYS.VITALS, JSON.stringify(allVitals));
+
+    // [NEW] Real-time Socket Notification
+    const socket = getSocket();
+    if (socket) {
+        socket.emit('send_notification', {
+            recipientId: pathNumber,
+            type: 'VITALS_UPDATED',
+            title: 'Vitals Updated',
+            message: 'Your latest vital signs have been recorded.',
+            metadata: { vitals }
+        });
+    }
+
     dispatchSync();
 };
 
@@ -295,6 +320,15 @@ export const saveAppointment = (appointment) => {
     appointments.unshift(newAppointment);
     localStorage.setItem(KEYS.APPOINTMENTS, JSON.stringify(appointments));
     syncToServer('appointments', 'add', newAppointment);
+
+    // [NEW] Real-time Socket Notification to Professional
+    const socket = getSocket();
+    if (socket && newAppointment.professionalId) {
+        socket.emit('new_appointment', {
+            ...newAppointment,
+            recipientId: newAppointment.professionalId // Ensure backend routes correctly
+        });
+    }
 
     // External Sync & Activity Log
     syncToExternalSystems('APPOINTMENT_BOOKED', {
@@ -455,6 +489,17 @@ export const updateAppointment = (id, updates) => {
                 message: `Your appointment status has been updated to: ${updates.status || appointments[index].status}.`,
                 details: { appointmentId: id }
             });
+
+            // [NEW] Real-time Socket Notification to Patient
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('send_notification', {
+                    recipientId: appointments[index].patientId,
+                    type: 'APPOINTMENT_UPDATED',
+                    title: 'Healthcare Update',
+                    message: `Your appointment status has been updated to: ${updates.status || appointments[index].status}.`,
+                });
+            }
         }
 
         dispatchSync();
@@ -474,6 +519,18 @@ export const addNotification = (notification) => {
     localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(notifications));
 
     syncToServer('notifications', 'add', newNotif);
+
+    // [NEW] Real-time Socket Notification (Generic fallback)
+    const socket = getSocket();
+    if (socket && newNotif.recipientId) {
+        socket.emit('send_notification', {
+            recipientId: newNotif.recipientId,
+            type: newNotif.type,
+            title: newNotif.title,
+            message: newNotif.message,
+            metadata: newNotif.details
+        });
+    }
 
     dispatchSync();
     return newNotif;

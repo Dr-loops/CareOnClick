@@ -689,6 +689,19 @@ export default function NurseDashboard({ user }) {
 
                                         if (res.ok) {
                                             alert('Vitals recorded successfully!');
+
+                                            // [NEW] Real-time Socket Notification to Patient
+                                            const { getSocket } = require('@/lib/socket');
+                                            const socket = getSocket();
+                                            if (socket) {
+                                                socket.emit('send_notification', {
+                                                    recipientId: selectedPatientId,
+                                                    type: 'VITALS_UPDATED',
+                                                    title: 'Vitals Updated',
+                                                    message: 'Your latest vital signs have been recorded by the nurse.',
+                                                });
+                                            }
+
                                             // [FIX] Immediate Refresh
                                             // Mutate vitals for this patient to update EKG/Charts
                                             mutate(`/api/vitals?patientId=${selectedPatientId}`);
