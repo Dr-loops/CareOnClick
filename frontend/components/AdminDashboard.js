@@ -828,6 +828,67 @@ export default function AdminDashboard({ user }) {
                                             </div>
                                         )}
 
+                                        {/* CLINICAL RECORDS TIMELINE */}
+                                        <div style={{ marginTop: '40px', borderTop: '2px solid #f1f5f9', paddingTop: '32px' }}>
+                                            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '16px', color: colors.text }}>Clinical Records & Timeline</h3>
+
+                                            {(() => {
+                                                const patientRecords = records.filter(r => r.patientId === patient.id);
+                                                if (patientRecords.length === 0) {
+                                                    return <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', color: colors.textLight, fontStyle: 'italic' }}>No clinical records found for this patient.</div>;
+                                                }
+
+                                                return (
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                                        <thead>
+                                                            <tr style={{ background: '#f1f5f9' }}>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Date</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Type</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Summary / Result</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Provider</th>
+                                                                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {patientRecords.map(r => (
+                                                                <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                    <td style={{ padding: '12px', fontFamily: 'monospace', color: '#666' }}>
+                                                                        {new Date(r.date).toLocaleDateString()}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px' }}>
+                                                                        <span style={{
+                                                                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
+                                                                            background: r.unit === 'Prescription' ? '#fffbeb' : r.unit === 'Vitals' ? '#f0fdf4' : '#eff6ff',
+                                                                            color: r.unit === 'Prescription' ? '#b45309' : r.unit === 'Vitals' ? '#15803d' : '#1d4ed8'
+                                                                        }}>
+                                                                            {r.unit || 'Record'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', fontWeight: '500' }}>
+                                                                        {r.fileName || (r.structuredData ? JSON.parse(r.structuredData).testName : 'Record')}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', color: colors.textLight }}>
+                                                                        {r.professionalName || 'System'}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                                                                        <button
+                                                                            onClick={() => { setViewingPatientId(null); setViewingRecord(r); }}
+                                                                            style={{
+                                                                                padding: '6px 12px', borderRadius: '6px', border: `1px solid ${colors.border}`,
+                                                                                background: 'white', color: colors.primary, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem'
+                                                                            }}
+                                                                        >
+                                                                            View
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                );
+                                            })()}
+                                        </div>
+
                                         <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end' }}>
                                             <button
                                                 onClick={() => { setViewingPatientId(null); setEditingPatient({ ...patient, ...p, id: patient.id }); }}
@@ -1634,36 +1695,56 @@ export default function AdminDashboard({ user }) {
                                             </div>
                                         </div>
                                     ) : (
-                                        <>
-                                            <div style={{ fontSize: '1.1rem', marginBottom: '16px', fontWeight: '500' }}>{viewingRecord.fileName}</div>
-                                            {(viewingRecord.structuredData) && (() => {
+                                        <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: '1.2rem', marginBottom: '16px', fontWeight: 'bold', color: colors.text }}>{viewingRecord.fileName || 'Clinical Detail'}</div>
+
+                                            {(() => {
                                                 try {
-                                                    const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : viewingRecord.structuredData;
+                                                    const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : (viewingRecord.structuredData || viewingRecord.structuredResults);
+                                                    if (!s) return <p style={{ color: '#666', fontStyle: 'italic' }}>No structured data available for this record.</p>;
+
+                                                    // Case 1: Clinical Note with nested results
+                                                    if (s.results || (s.testName && typeof s.testName === 'string' && s.testName.includes('Clinical'))) {
+                                                        const results = s.results || s;
+                                                        return (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                                {Object.entries(results).map(([key, val]) => {
+                                                                    if (key === 'testName' || typeof val === 'object') return null;
+                                                                    return (
+                                                                        <div key={key}>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>{key.replace(/([A-Z])/g, ' $1')}</div>
+                                                                            <div style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{String(val)}</div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Case 2: Standard Lab Result / Prescription
                                                     return (
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px' }}>
-                                                            <thead style={{ background: '#f8fafc' }}>
-                                                                <tr>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Test</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Result</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Units</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Ref. Range</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Flag</th>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                            <thead>
+                                                                <tr style={{ textAlign: 'left', borderBottom: '2px solid #e2e8f0' }}>
+                                                                    <th style={{ padding: '12px', color: '#64748b', fontSize: '0.8rem' }}>FIELD</th>
+                                                                    <th style={{ padding: '12px', color: '#64748b', fontSize: '0.8rem' }}>RESULT</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.testName || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>{s.result || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.unit || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.range || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee', color: s.flag === 'High' ? 'red' : s.flag === 'Low' ? 'orange' : 'green', fontWeight: 'bold' }}>{s.flag || 'Normal'}</td>
-                                                                </tr>
+                                                                {Object.entries(s).map(([key, val]) => (
+                                                                    <tr key={key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                        <td style={{ padding: '12px', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase' }}>{key}</td>
+                                                                        <td style={{ padding: '12px' }}>{String(val)}</td>
+                                                                    </tr>
+                                                                ))}
                                                             </tbody>
                                                         </table>
-                                                    )
-                                                } catch (e) { return null; }
+                                                    );
+                                                } catch (e) {
+                                                    return <p>{viewingRecord.fileName || 'General Medical Record'}</p>;
+                                                }
                                             })()}
-                                        </>
+                                        </div>
                                     )}
                                 </div>
 

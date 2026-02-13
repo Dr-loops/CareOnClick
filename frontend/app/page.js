@@ -23,11 +23,8 @@ export default function Home() {
                         </Link>
                     </div>
                     <div className="hero-meta">
-                        <Link href="/register?type=professional" className="meta-link">
-                            Are you a Medical Professional? Join us →
-                        </Link>
-                        <Link href="/register?type=admin" className="meta-link-sub">
-                            Admin Portal
+                        <Link href="/register?type=professional" className="prof-registration-card">
+                            Register as Health Professional
                         </Link>
                     </div>
                 </div>

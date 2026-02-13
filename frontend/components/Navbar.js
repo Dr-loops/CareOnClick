@@ -45,7 +45,7 @@ export default function Navbar() {
 
                 {/* Action Buttons */}
                 <div className="nav-actions">
-                    <Link href="https://wa.me/233540509530" target="_blank" className="btn btn-secondary hide-on-mobile">
+                    <Link href="https://wa.me/233246344188" target="_blank" className="btn btn-secondary hide-on-mobile">
                         <MessageCircle size={18} />
                         Help Center
                     </Link>
@@ -99,7 +99,7 @@ export default function Navbar() {
                         ) : (
                             <button onClick={logout} className="btn btn-danger" style={{ marginTop: '1rem', width: '100%' }}>Logout</button>
                         )}
-                        <Link href="https://wa.me/233540509530" target="_blank" className="mobile-help-link">
+                        <Link href="https://wa.me/233246344188" target="_blank" className="mobile-help-link">
                             <MessageCircle size={18} /> Need Help? Chat with us
                         </Link>
                     </div>

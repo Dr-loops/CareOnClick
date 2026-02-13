@@ -22,9 +22,9 @@ export default function Footer() {
                             Your trusted virtual hospital. connecting patients with top-tier medical professionals worldwide.
                         </p>
                         <div className="social-links">
-                            <Link href="#" className="social-link"><Facebook size={20} /></Link>
-                            <Link href="#" className="social-link"><Twitter size={20} /></Link>
-                            <Link href="#" className="social-link"><Instagram size={20} /></Link>
+                            <Link href="https://www.facebook.com/profile.php?id=61587537417641" target="_blank" className="social-link"><Facebook size={20} /></Link>
+                            <Link href="https://x.com/careonclick_gh?s=21" target="_blank" className="social-link"><Twitter size={20} /></Link>
+                            <Link href="https://www.instagram.com/careonclick_gh?igsh=MXBpdHp4czluMm42dQ%3D%3D&utm_source=qr" target="_blank" className="social-link"><Instagram size={20} /></Link>
                             <Link href="#" className="social-link"><Linkedin size={20} /></Link>
                         </div>
                     </div>
@@ -45,7 +45,7 @@ export default function Footer() {
                     <div className="footer-col">
                         <h4 className="footer-heading">Support</h4>
                         <ul className="footer-links">
-                            <li><Link href="https://wa.me/233540509530" target="_blank">Help Center</Link></li>
+                            <li><Link href="https://wa.me/233246344188" target="_blank">Help Center</Link></li>
                             <li><Link href="/privacy">Privacy Policy</Link></li>
                             <li><Link href="/terms">Terms of Service</Link></li>
                             <li><Link href="/contact">Contact Us</Link></li>

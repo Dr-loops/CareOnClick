@@ -2091,7 +2091,40 @@ h6 {
 .hero-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.prof-registration-card {
+  background: linear-gradient(135deg, var(--color-secondary-700), var(--color-secondary-500));
+  color: white !important;
+  padding: 1.5rem 2rem;
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 400px;
+}
+
+.prof-registration-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(26, 35, 126, 0.3);
+  filter: brightness(1.1);
+}
+
+.prof-registration-card::after {
+  content: '→';
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.prof-registration-card:hover::after {
+  transform: translateX(5px);
 }
 
 .meta-link {
