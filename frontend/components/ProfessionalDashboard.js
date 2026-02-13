@@ -42,26 +42,48 @@ import VideoConsultation from './VideoConsultation';
 import CommunicationHub from './CommunicationHub';
 import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW]
 
-const AlertsView = ({ professionalName, role, professionalId }) => {
+const AlertsView = ({ professionalName, role, professionalId, apiAppointments = [], onRefresh }) => {
+    // 1. Pending Appointments (Source of Truth: API)
+    const pendingAppointments = apiAppointments.filter(a =>
+        a.status === 'Pending' &&
+        (a.professionalId === professionalId || role === 'Admin' || (role === 'Scientist' && a.category === 'Scientist'))
+    );
+
+    // 2. Other Notifications (Local/Global Sync)
     const notifications = getGlobalData(KEYS.NOTIFICATIONS, []);
     const myNotifications = notifications.filter(n =>
         (n.professionalName === professionalName || n.recipientId === role || n.recipientId === professionalId || n.recipientId === 'STAFF') &&
         n.status !== 'Dismissed'
     );
 
-    const handleAction = (id, action) => {
+    const handleAppointmentAction = async (id, action) => {
+        const newStatus = action === 'Accept' ? 'Upcoming' : 'Cancelled';
+        const confirmMsg = action === 'Accept' ? 'Accept this appointment?' : 'Reject this appointment?';
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await fetch('/api/appointments', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, status: newStatus })
+            });
+
+            if (res.ok) {
+                alert(`Appointment ${action}ed successfully.`);
+                if (onRefresh) onRefresh();
+            } else {
+                alert('Failed to update status.');
+            }
+        } catch (e) {
+            console.error("Error updating appointment", e);
+            alert('An error occurred.');
+        }
+    };
+
+    const handleNotificationAction = (id, action) => {
         if (action === 'Dismiss') {
             updateNotificationStatus(id, { status: 'Dismissed' });
-        } else if (action === 'Accept') {
-            const notif = notifications.find(n => n.id === id);
-            updateNotificationStatus(id, { status: 'Accepted' });
-
-            // Log confirmation activity
-            if (notif && notif.details?.appointmentId) {
-                // Trigger "In Progress"
-                updateAppointmentStatus(notif.details.appointmentId, { status: 'In Progress' });
-            }
-            alert('Appointment Accepted! Status set to In Progress. Patient will be notified.');
         } else if (action === 'Snooze') {
             updateNotificationStatus(id, { status: 'Snoozed' });
         }
@@ -69,72 +91,73 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
 
     return (
         <Card title="Recent Alerts & Notifications 🔔">
-            <p style={{ color: 'var(--color-grey-500)', marginBottom: '1.5rem' }}>Stay updated with patient bookings and payment confirmations.</p>
+            <p style={{ color: 'var(--color-grey-500)', marginBottom: '1.5rem' }}>
+                Manage pending appointment requests and system notifications.
+            </p>
 
             <div className="alerts-container">
-                {myNotifications.length === 0 ? (
+                {pendingAppointments.length === 0 && myNotifications.length === 0 ? (
                     <div className="alert-empty-state">
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                         <h4>No new alerts</h4>
-                        <p style={{ color: 'var(--color-grey-500)' }}>Check back later for new patient activities.</p>
+                        <p style={{ color: 'var(--color-grey-500)' }}>You're all caught up!</p>
                     </div>
                 ) : (
-                    myNotifications.map(notif => (
-                        <Card key={notif.id} className="alert-card" style={{
-                            borderColor: notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981',
-                            background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
-                        }}>
-                            <div className="alert-header">
-                                <div>
-                                    <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{notif.title}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
-                                </div>
-                                <Badge variant={notif.status === 'Accepted' ? 'success' : 'neutral'}>
-                                    {notif.status}
-                                </Badge>
+                    <>
+                        {/* Pending Requests Section */}
+                        {pendingAppointments.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                                <h4 style={{ color: '#d97706', borderBottom: '2px solid #fcd34d', paddingBottom: '0.5rem' }}>⏳ Pending Requests ({pendingAppointments.length})</h4>
+                                {pendingAppointments.map(app => (
+                                    <Card key={app.id} className="alert-card" style={{
+                                        borderColor: '#f59e0b',
+                                        background: '#fffbeb',
+                                        marginTop: '1rem'
+                                    }}>
+                                        <div className="alert-header">
+                                            <div>
+                                                <h4 style={{ margin: 0, color: '#92400e' }}>New Appointment Request</h4>
+                                                <p style={{ fontSize: '0.8rem', color: '#b45309', margin: '0.2rem 0' }}>Received: {new Date(app.createdAt || Date.now()).toLocaleString()}</p>
+                                            </div>
+                                            <Badge variant="warning">Action Required</Badge>
+                                        </div>
+                                        <div className="alert-details" style={{ margin: '1rem 0' }}>
+                                            <div><strong>Patient:</strong> {app.patientName}</div>
+                                            <div><strong>Type:</strong> {app.type} Consultation</div>
+                                            <div><strong>Requested Time:</strong> {app.date} at {app.time}</div>
+                                            <div><strong>Payment:</strong> {app.paymentStatus} (GHS {app.amountPaid})</div>
+                                        </div>
+                                        <div className="alert-actions">
+                                            <Button onClick={() => handleAppointmentAction(app.id, 'Accept')} variant="primary" size="sm">✅ Accept</Button>
+                                            <Button onClick={() => handleAppointmentAction(app.id, 'Reject')} variant="danger" size="sm">❌ Reject</Button>
+                                        </div>
+                                    </Card>
+                                ))}
                             </div>
-                            <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                        )}
 
-                            {notif.details && (
-                                <div className="alert-details">
-                                    {notif.type === 'APPOINTMENT_BOOKING' ? (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Type:</strong> {notif.details.appointmentType}</div>
-                                            <div><strong>Date:</strong> {notif.details.date} at {notif.details.time}</div>
-                                            <div><strong>Reason:</strong> {notif.details.reason}</div>
-                                            {notif.details.balanceDue > 0 ? (
-                                                <div style={{ marginTop: '0.5rem', color: 'var(--color-error)', fontWeight: 'bold' }}>
-                                                    ⚠️ Part Payment: GHS {notif.details.amountPaid} (Bal: {notif.details.balanceDue})
-                                                </div>
-                                            ) : notif.details.amountPaid ? (
-                                                <div style={{ marginTop: '0.5rem', color: 'var(--color-success)', fontWeight: 'bold' }}>
-                                                    ✅ Full Payment: GHS {notif.details.amountPaid}
-                                                </div>
-                                            ) : null}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Amount:</strong> {notif.details.amount}</div>
-                                            <div><strong>Status:</strong> <Badge variant="success">Confirmed</Badge></div>
-                                        </>
-                                    )}
+                        {/* General Notifications Section */}
+                        {myNotifications.map(notif => (
+                            <Card key={notif.id} className="alert-card" style={{
+                                borderColor: notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981',
+                                background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
+                                opacity: 0.9
+                            }}>
+                                <div className="alert-header">
+                                    <div>
+                                        <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{notif.title}</h4>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
+                                    </div>
+                                    <Badge variant="neutral">{notif.status}</Badge>
                                 </div>
-                            )}
-
-                            <div className="alert-actions">
-                                {notif.type === 'APPOINTMENT_BOOKING' && notif.status !== 'Accepted' && (
-                                    <>
-                                        <Button onClick={() => handleAction(notif.id, 'Accept')} variant="primary" size="sm">Accept</Button>
-                                        <Button onClick={() => alert('Feature coming soon: Suggesting alternative time.')} variant="secondary" size="sm">Suggest Alt Time</Button>
-                                    </>
-                                )}
-                                <Button onClick={() => handleAction(notif.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
-                                <Button onClick={() => handleAction(notif.id, 'Dismiss')} variant="danger" size="sm">Dismiss</Button>
-                            </div>
-                        </Card>
-                    ))
+                                <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                                <div className="alert-actions">
+                                    <Button onClick={() => handleNotificationAction(notif.id, 'Dismiss')} variant="secondary" size="sm">Dismiss</Button>
+                                    <Button onClick={() => handleNotificationAction(notif.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
+                                </div>
+                            </Card>
+                        ))}
+                    </>
                 )}
             </div>
         </Card>
@@ -160,19 +183,38 @@ export default function ProfessionalDashboard({ user }) {
 
             socket.on('appointment_change', () => {
                 // Refresh data
-                // In a real app we would refetch, but here we trigger sync tick or rely on optimistic updates
-                // dispatchSync() is available via import but we need to use it.
-                // Wait, useGlobalSync returns 'syncTick' but doesn't expose dispatchSync?
-                // The global_sync module exports dispatchSync? No, it exports internal dispatch logic?
-                // Actually `useGlobalSync` just listens.
-                // We need to trigger a re-eval or re-fetch.
-                // We can force a re-render or re-fetch apiPatients.
+                const fetchApiData = async () => {
+                    try {
+                        const resApps = await fetch('/api/appointments');
+                        if (resApps.ok) {
+                            setApiAppointments(await resApps.json());
+                        }
+                    } catch (e) {
+                        console.error("Failed to refresh dashboard data", e);
+                    }
+                };
+                fetchApiData();
             });
-            socket.on('receive_message', () => { }); // Handle messages
+
+            socket.on('receive_message', (data) => {
+                setToast({ message: `New message from ${data.senderName || 'Patient'}`, type: 'info' });
+            });
+
+            // [NEW] Handle Real-time Notifications
+            socket.on('notification', (data) => {
+                setToast({ message: data.message || 'New Notification', type: 'info' });
+                // Play sound?
+                const audio = new Audio('/notification.mp3').catch(() => { }); // distinct sound if available
+                if (data.appointment) {
+                    // Update list immediately
+                    setApiAppointments(prev => [data.appointment, ...prev]);
+                }
+            });
 
             return () => {
                 socket.off('appointment_change');
                 socket.off('receive_message');
+                socket.off('notification');
             };
         }
     }, [user]);
@@ -221,20 +263,20 @@ export default function ProfessionalDashboard({ user }) {
     const [toast, setToast] = useState(null);
 
     // [NEW] Fetch Appointments from API
-    useEffect(() => {
-        const fetchApiData = async () => {
-            try {
-                // Fetch all appointments (filtered by professionalId server-side ideally, but for now we fetch all and filter locally for scientist if needed, or api returns all for professionals)
-                const resApps = await fetch('/api/appointments');
-                if (resApps.ok) {
-                    const data = await resApps.json();
-                    setApiAppointments(data);
-                }
-            } catch (e) {
-                console.error("Failed to fetch dashboard data", e);
+    const fetchApiData = async () => {
+        try {
+            // Fetch all appointments
+            const resApps = await fetch('/api/appointments');
+            if (resApps.ok) {
+                const data = await resApps.json();
+                setApiAppointments(data);
             }
-        };
+        } catch (e) {
+            console.error("Failed to fetch dashboard data", e);
+        }
+    };
 
+    useEffect(() => {
         fetchApiData();
     }, [user, user?.role]); // Re-fetch if user changes
     const [messages, setMessages] = useState([]);
@@ -1463,7 +1505,13 @@ export default function ProfessionalDashboard({ user }) {
                         {/* Alerts Tab */}
                         {
                             activeLabTab === 'alerts' && (
-                                <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                                <AlertsView
+                                    professionalName={user.name}
+                                    role={user.role}
+                                    professionalId={user.id}
+                                    apiAppointments={apiAppointments}
+                                    onRefresh={fetchApiData}
+                                />
                             )
                         }
                     </div >
@@ -1472,7 +1520,13 @@ export default function ProfessionalDashboard({ user }) {
                         {activeLabTab === 'collaboration' ? (
                             <CollaborationTab user={user} selectedPatientId={selectedPatientId} />
                         ) : activeLabTab === 'alerts' ? (
-                            <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                            <AlertsView
+                                professionalName={user.name}
+                                role={user.role}
+                                professionalId={user.id}
+                                apiAppointments={apiAppointments}
+                                onRefresh={fetchApiData}
+                            />
                         ) : activeLabTab === 'patient-records' ? (
                             <Card>
                                 <div style={{ marginBottom: '1.5rem' }}>

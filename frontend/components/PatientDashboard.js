@@ -570,6 +570,10 @@ export default function PatientDashboard({ user }) {
                                 <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', minHeight: '60px' }}>{profile.address || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>WhatsApp Number</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.whatsappNumber || 'Not Set'}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Region (Ghana)</label>
                                 <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.region || 'Not Set'}</div>
                             </div>
@@ -702,6 +706,29 @@ export default function PatientDashboard({ user }) {
                                         required
                                         style={{ padding: '0.8rem' }}
                                     />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>WhatsApp Number</label>
+                                    <input
+                                        type="tel"
+                                        value={profile.whatsappNumber || ""}
+                                        onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })}
+                                        className="input"
+                                        placeholder="+233..."
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Region (Ghana)</label>
+                                    <select
+                                        className="input"
+                                        value={profile.region || ""}
+                                        onChange={(e) => setProfile({ ...profile, region: e.target.value })}
+                                        style={{ padding: '0.8rem' }}
+                                    >
+                                        <option value="">Select Region</option>
+                                        {ghanaRegions.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                     <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Date of Birth</label>
@@ -1032,6 +1059,18 @@ export default function PatientDashboard({ user }) {
                                                             })
                                                         });
                                                         if (res.ok) {
+                                                            // [NEW] Real-time Notification
+                                                            const socket = getSocket();
+                                                            if (socket) {
+                                                                socket.emit('new_appointment', {
+                                                                    professionalId: selectedProfessional.id,
+                                                                    patientName: profile.fullName || user.name,
+                                                                    date: appointmentDate,
+                                                                    time: finalTime,
+                                                                    type: appointmentType
+                                                                });
+                                                            }
+
                                                             // [NEW] Sync with Admin Financial Audit Log
                                                             if (typeof window !== 'undefined') {
                                                                 const logs = JSON.parse(localStorage.getItem('dr_kal_audit_logs') || '[]');

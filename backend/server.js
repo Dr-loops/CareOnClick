@@ -38,6 +38,22 @@ io.on('connection', (socket) => {
         io.emit('appointment_change', data);
     });
 
+    // Handle New Appointment Booking (Real-time Alert)
+    socket.on('new_appointment', (data) => {
+        console.log('New Appointment Event:', data);
+        if (data.professionalId) {
+            // Notify the professional specifically
+            io.to(data.professionalId).emit('notification', {
+                type: 'APPOINTMENT_PENDING',
+                title: 'New Appointment Request',
+                message: `New booking request from ${data.patientName || 'a patient'}`,
+                appointment: data
+            });
+            // Also refresh their dashboard data
+            io.to(data.professionalId).emit('appointment_change', data);
+        }
+    });
+
     // Handle Messages
     socket.on('send_message', (data) => {
         if (data.patientId) {
@@ -47,7 +63,8 @@ io.on('connection', (socket) => {
 
     // --- WebRTC Signaling ---
     socket.on('call-user', (data) => {
-        io.to(data.userToCall).emit('call-made', {
+        console.log(`Call from ${data.from} to room ${data.userToCall}`);
+        socket.to(data.userToCall).emit('call-made', {
             signal: data.signalData,
             from: data.from,
             name: data.name
@@ -55,17 +72,24 @@ io.on('connection', (socket) => {
     });
 
     socket.on('make-answer', (data) => {
-        io.to(data.to).emit('answer-made', {
+        console.log(`Answer from ${socket.id} to ${data.to}`);
+        socket.to(data.to).emit('answer-made', {
             signal: data.signal,
             answerId: socket.id
         });
     });
 
     socket.on('ice-candidate', (data) => {
-        io.to(data.to).emit('ice-candidate-received', {
+        // console.log(`ICE Candidate from ${socket.id} to ${data.to}`);
+        socket.to(data.to).emit('ice-candidate-received', {
             candidate: data.candidate,
             from: socket.id
         });
+    });
+
+    socket.on('leave-call', (data) => {
+        console.log(`User ${socket.id} left call to ${data.to}`);
+        socket.to(data.to).emit('call-ended');
     });
 
     socket.on('disconnect', () => {
