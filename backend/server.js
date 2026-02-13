@@ -86,34 +86,53 @@ io.on('connection', (socket) => {
     });
 
     // --- WebRTC Signaling ---
-    socket.on('call-user', (data) => {
-        console.log(`Call from ${data.from} to room ${data.userToCall}`);
-        socket.to(data.userToCall).emit('call-made', {
-            signal: data.signalData,
-            from: data.from,
-            name: data.name
+    socket.on('call-invite', (data) => {
+        const { to, from, name, roomId } = data;
+        console.log(`[Call Invite] From: ${name} (${from}) to: ${to} in Room: ${roomId}`);
+        // Notify the specific user or room about the incoming call
+        socket.to(to).emit('incoming-call', {
+            from,
+            name,
+            roomId
         });
     });
 
-    socket.on('make-answer', (data) => {
-        console.log(`Answer from ${socket.id} to ${data.to}`);
-        socket.to(data.to).emit('answer-made', {
-            signal: data.signal,
-            answerId: socket.id
+    socket.on('join-video-room', (roomId) => {
+        socket.join(roomId);
+        console.log(`[Video Room] User ${socket.id} joined: ${roomId}`);
+        // Notify others in the room that a new user joined
+        socket.to(roomId).emit('user-joined', { userId: socket.id });
+    });
+
+    socket.on('webrtc-offer', (data) => {
+        console.log(`[WebRTC Offer] From ${socket.id} to ${data.to}`);
+        socket.to(data.to).emit('webrtc-offer', {
+            offer: data.offer,
+            from: socket.id
         });
     });
 
-    socket.on('ice-candidate', (data) => {
-        // console.log(`ICE Candidate from ${socket.id} to ${data.to}`);
-        socket.to(data.to).emit('ice-candidate-received', {
+    socket.on('webrtc-answer', (data) => {
+        console.log(`[WebRTC Answer] From ${socket.id} to ${data.to}`);
+        socket.to(data.to).emit('webrtc-answer', {
+            answer: data.answer,
+            from: socket.id
+        });
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        // console.log(`[ICE Candidate] From ${socket.id} to ${data.to}`);
+        socket.to(data.to).emit('webrtc-ice-candidate', {
             candidate: data.candidate,
             from: socket.id
         });
     });
 
     socket.on('leave-call', (data) => {
-        console.log(`User ${socket.id} left call to ${data.to}`);
-        socket.to(data.to).emit('call-ended');
+        const { roomId } = data;
+        console.log(`[Leave Call] User ${socket.id} left room ${roomId}`);
+        socket.to(roomId).emit('user-left', { userId: socket.id });
+        socket.leave(roomId);
     });
 
     socket.on('disconnect', () => {

@@ -7,9 +7,13 @@
     "backend"
   ],
   "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "frontend": "npm run dev --workspace=frontend",
     "backend": "npm run dev --workspace=backend",
     "build": "npm run build --workspaces",
     "install-all": "npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

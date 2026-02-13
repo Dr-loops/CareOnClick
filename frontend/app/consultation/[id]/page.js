@@ -21,9 +21,7 @@ export default function ConsultationPage() {
 
     return (
         <VideoConsultation
-            patientId={params.id} // This is the ID of the person we are calling OR the session ID. 
-            // In a real app, 'id' might be appointment ID.
-            // For now, based on dashboard link, it's the Patient ID or Professional ID.
+            roomId={params.id}
             user={user}
         />
     );

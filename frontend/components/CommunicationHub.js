@@ -215,7 +215,19 @@ export default function CommunicationHub({
                             {/* Telehealth Room */}
                             <Card
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #a855f7', background: '#f3e8ff', transition: 'transform 0.2s' }}
-                                onClick={() => selectedTarget && setShowVideoConsultation(true)}
+                                onClick={() => {
+                                    if (!selectedTarget) return;
+                                    const socket = getSocket();
+                                    if (socket) {
+                                        socket.emit('call-invite', {
+                                            to: selectedTarget.id,
+                                            from: user.id,
+                                            name: user.name,
+                                            roomId: user.id // Using sender's ID as Room ID for simplicity
+                                        });
+                                    }
+                                    setShowVideoConsultation(true);
+                                }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>🩺</div>
                                 <div style={{ fontWeight: 'bold', color: '#7e22ce' }}>Telehealth Video Room</div>
@@ -225,7 +237,19 @@ export default function CommunicationHub({
                             {/* Video Call */}
                             <Card
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #f59e0b', background: '#fffbeb', transition: 'transform 0.2s' }}
-                                onClick={() => selectedTarget && setShowVideoConsultation(true)}
+                                onClick={() => {
+                                    if (!selectedTarget) return;
+                                    const socket = getSocket();
+                                    if (socket) {
+                                        socket.emit('call-invite', {
+                                            to: selectedTarget.id,
+                                            from: user.id,
+                                            name: user.name,
+                                            roomId: user.id
+                                        });
+                                    }
+                                    setShowVideoConsultation(true);
+                                }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📹</div>
                                 <div style={{ fontWeight: 'bold', color: '#b45309' }}>Quick Video Call</div>
@@ -309,8 +333,7 @@ export default function CommunicationHub({
             {showVideoConsultation && selectedTarget && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999 }}>
                     <VideoConsultation
-                        roomId={selectedTarget.id}
-                        patientId={targetType === 'patient' ? selectedTarget.id : null}
+                        roomId={user.id}
                         user={user}
                     />
                     <button
