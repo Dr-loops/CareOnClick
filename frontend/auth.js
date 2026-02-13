@@ -48,8 +48,9 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
 
                         const passwordsMatch = await bcrypt.compare(password, user.password);
                         if (passwordsMatch) {
-                            if (user.verificationStatus !== 'Verified') {
-                                console.log(`[AUTH] ⚠️ BLOCK: User ${user.email} is ${user.verificationStatus} (not Verified)`);
+                            const isAllowed = user.verificationStatus === 'Verified' || user.verificationStatus === 'Approved';
+                            if (!isAllowed) {
+                                console.log(`[AUTH] ⚠️ BLOCK: User ${user.email} is ${user.verificationStatus} (not Verified/Approved)`);
                                 throw new Error('Account pending verification');
                             }
                             console.log(`[AUTH] ✅ SUCCESS: Password MATCH for: ${user.email}`);
