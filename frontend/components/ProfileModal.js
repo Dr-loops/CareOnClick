@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Camera, X } from 'lucide-react';
+import { POPULAR_REGIONS } from '@/lib/location_data';
 
 // Let's assume we need to build a self-contained modal helper or reusing one.
 // ProfessionalDashboard uses Card, Button, Input. Let's use those.
@@ -217,7 +218,18 @@ export default function ProfileModal({ user, onClose, onSave }) {
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>Region</label>
-                            <input className="input-field" name="region" value={formData.region} onChange={handleChange} style={{ width: '100%' }} />
+                            <select
+                                className="input-field"
+                                name="region"
+                                value={formData.region}
+                                onChange={handleChange}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="">Select Region</option>
+                                {POPULAR_REGIONS['Ghana'].map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
