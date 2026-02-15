@@ -7,6 +7,7 @@ import PatientAutofillInputs from './ui/PatientAutofillInputs';
 // import WhatsAppButton from './WhatsAppButton'; // Unused
 import DictationRecorder from './DictationRecorder';
 import VideoConsultation from './VideoConsultation';
+import { getSocket } from '@/lib/socket';
 
 export default function CommunicationHub({
     user,
@@ -50,10 +51,8 @@ export default function CommunicationHub({
         }
         setLoadingMessages(true);
         try {
-            // API currently optimized for patient-user messages. 
-            // For staff-staff, we might need a different query or the same if backend supports generic 'recipientId'.
-            // Assuming /api/messages supports generic recipientId for now, or just fetches based on ID.
-            const res = await fetch(`/api/messages?patientId=${selectedTargetId}&userId=${user.id}`);
+            // Use 'direct=true' for strict P2P isolation
+            const res = await fetch(`/api/messages?patientId=${selectedTargetId}&direct=true`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
@@ -77,6 +76,18 @@ export default function CommunicationHub({
         } else {
             setMessages([]);
         }
+
+        // Socket listener for real-time updates in the active conversation
+        const socket = getSocket();
+        if (socket) {
+            const handleMessage = (data) => {
+                if (data.senderId === selectedTargetId || data.recipientId === selectedTargetId) {
+                    fetchMessages();
+                }
+            };
+            socket.on('receive_message', handleMessage);
+            return () => socket.off('receive_message', handleMessage);
+        }
     }, [selectedTargetId]);
 
     const handleSendMessage = async () => {
@@ -97,7 +108,10 @@ export default function CommunicationHub({
                     recipientPhone: selectedTarget.phoneNumber,
                     recipientEmail: selectedTarget.email,
                     content,
-                    type
+                    type,
+                    senderId: user.id,
+                    senderName: user.name,
+                    role: user.role
                 })
             });
             const data = await res.json();
@@ -105,8 +119,7 @@ export default function CommunicationHub({
                 alert(`Message sent via ${type}!`);
                 document.getElementById('comm-hub-msg-content').value = '';
 
-                // [NEW] Emit Real-time Socket Notification
-                const { getSocket } = require('@/lib/socket');
+                // Emit Real-time Socket Notification
                 const socket = getSocket();
                 if (socket) {
                     socket.emit('send_message', {
@@ -125,6 +138,21 @@ export default function CommunicationHub({
         } catch (e) {
             console.error(e);
             alert('Error sending message');
+        }
+    };
+
+    const handleDeleteMessage = async (id) => {
+        if (!confirm('Are you sure you want to delete this message?')) return;
+        try {
+            const res = await fetch(`/api/messages?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages(prev => prev.filter(m => m.id !== id));
+            } else {
+                alert('Failed to delete message');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting message');
         }
     };
 
@@ -317,9 +345,19 @@ export default function CommunicationHub({
                                         border: msg.senderId === user.id ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
                                         alignSelf: msg.senderId === user.id ? 'flex-end' : 'flex-start',
                                         maxWidth: '90%',
-                                        marginLeft: msg.senderId === user.id ? 'auto' : '0'
+                                        marginLeft: msg.senderId === user.id ? 'auto' : '0',
+                                        position: 'relative'
                                     }}>
-                                        <div style={{ fontSize: '0.9rem' }}>{msg.content}</div>
+                                        {msg.senderId === user.id && (
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                style={{ position: 'absolute', top: '5px', right: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.5 }}
+                                                title="Delete message"
+                                            >
+                                                🗑️
+                                            </button>
+                                        )}
+                                        <div style={{ fontSize: '0.9rem', paddingRight: msg.senderId === user.id ? '20px' : '0' }}>{msg.content}</div>
                                         <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.4rem', textAlign: 'right' }}>
                                             {msg.type} • {new Date(msg.timestamp).toLocaleString()}
                                         </div>

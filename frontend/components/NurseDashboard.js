@@ -4,6 +4,7 @@ import { saveGlobalRecord, getGlobalData, KEYS, updateNotificationStatus, update
 import { analyzeResult, analyzeBP } from '@/lib/medical_analysis';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
 import { useSWRConfig } from 'swr'; // [FIX] Import SWR Config
+import { getSocket } from '@/lib/socket';
 
 import PatientRecordFinder from './PatientRecordFinder';
 
@@ -22,12 +23,50 @@ import ProfileModal from './ProfileModal'; // [NEW]
 import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW] Invoice Modal
 
 
-const AlertsView = ({ professionalName, role, professionalId }) => {
+const AlertsView = ({ professionalName, role, professionalId, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
+
     const notifications = getGlobalData(KEYS.NOTIFICATIONS, []);
     const myNotifications = notifications.filter(n =>
         (n.professionalName === professionalName || n.recipientId === role || n.recipientId === professionalId || n.recipientId === 'STAFF') &&
         n.status !== 'Dismissed'
     );
+
+    const fetchMessages = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                // Filter for messages where I am the recipient
+                const incoming = data.filter(m => m.recipientId === professionalId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Failed to fetch messages", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = getSocket();
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+            };
+        }
+    }, [professionalId]);
 
     const handleAction = (id, action) => {
         if (action === 'Dismiss') {
@@ -36,37 +75,57 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
             const notif = notifications.find(n => n.id === id);
             updateNotificationStatus(id, { status: 'Accepted' });
 
-            // Log confirmation activity
             if (notif && notif.details?.appointmentId) {
                 updateAppointment(notif.details.appointmentId, {
                     status: 'Confirmed',
                     updatedBy: professionalName
                 });
             }
-
             alert('Appointment Accepted! Patient will be notified.');
         } else if (action === 'Snooze') {
             updateNotificationStatus(id, { status: 'Snoozed' });
         }
     };
 
+    // Merge notifications and messages for a unified timeline
+    const allAlerts = [
+        ...myNotifications.map(n => ({ ...n, alertType: 'NOTIFICATION' })),
+        ...messages.map(m => ({
+            id: m.id,
+            title: `Message from ${m.senderName}`,
+            message: m.content,
+            timestamp: m.timestamp,
+            status: 'Unread', // For UI
+            type: 'CHAT',
+            senderId: m.senderId,
+            alertType: 'MESSAGE'
+        }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
     return (
         <div className="card" style={{ padding: '2rem' }}>
-            <h3>Recent Alerts & Notifications 🔔</h3>
-            <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Stay updated with patient bookings and payment confirmations.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                    <h3>Recent Alerts & Messages 🔔</h3>
+                    <p style={{ color: '#64748b', margin: 0 }}>Stay updated with patient activities and staff communications.</p>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={fetchMessages} disabled={loading}>
+                    {loading ? '...' : '↻ Refresh'}
+                </button>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {myNotifications.length === 0 ? (
+                {allAlerts.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                         <h4>No new alerts</h4>
                         <p style={{ color: '#64748b' }}>Check back later for new patient activities.</p>
                     </div>
                 ) : (
-                    myNotifications.map(notif => (
-                        <div key={notif.id} className="card" style={{
-                            borderLeft: `5px solid ${notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981'}`,
-                            background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
+                    allAlerts.map(alertItem => (
+                        <div key={alertItem.id} className="card" style={{
+                            borderLeft: `5px solid ${alertItem.alertType === 'MESSAGE' ? '#8b5cf6' : (alertItem.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981')}`,
+                            background: alertItem.status === 'Unread' ? '#f0f9ff' : 'white',
                             position: 'relative',
                             padding: '1.5rem',
                             borderRadius: '8px',
@@ -75,59 +134,34 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                 <div>
-                                    <h4 style={{ margin: 0, color: '#1e293b' }}>{notif.title}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
+                                    <h4 style={{ margin: 0, color: '#1e293b' }}>{alertItem.title}</h4>
+                                    <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0' }}>{new Date(alertItem.timestamp).toLocaleString()}</p>
                                 </div>
                                 <span style={{
                                     padding: '0.2rem 0.6rem',
                                     borderRadius: '20px',
                                     fontSize: '0.7rem',
                                     fontWeight: 'bold',
-                                    background: notif.status === 'Accepted' ? '#dcfce7' : '#f1f5f9',
-                                    color: notif.status === 'Accepted' ? '#15803d' : '#475569'
+                                    background: alertItem.status === 'Accepted' ? '#dcfce7' : '#f1f5f9',
+                                    color: alertItem.status === 'Accepted' ? '#15803d' : '#475569'
                                 }}>
-                                    {notif.status}
+                                    {alertItem.status}
                                 </span>
                             </div>
-                            <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                            <p style={{ margin: '0 0 1rem 0' }}>{alertItem.message}</p>
 
-                            {notif.details && (
-                                <div style={{ background: '#f8fafc', padding: '0.8rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                                    {notif.type === 'APPOINTMENT_BOOKING' ? (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Type:</strong> {notif.details.appointmentType}</div>
-                                            <div><strong>Date:</strong> {notif.details.date} at {notif.details.time}</div>
-                                            <div><strong>Reason:</strong> {notif.details.reason}</div>
-                                            {notif.details.balanceDue > 0 ? (
-                                                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontWeight: 'bold' }}>
-                                                    ⚠️ Part Payment: GHS {notif.details.amountPaid} (Bal: {notif.details.balanceDue})
-                                                </div>
-                                            ) : notif.details.amountPaid ? (
-                                                <div style={{ marginTop: '0.5rem', color: '#16a34a', fontWeight: 'bold' }}>
-                                                    ✅ Full Payment: GHS {notif.details.amountPaid}
-                                                </div>
-                                            ) : null}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Amount:</strong> {notif.details.amount}</div>
-                                            <div><strong>Status:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>Confirmed</span></div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                {notif.type === 'APPOINTMENT_BOOKING' && notif.status !== 'Accepted' && (
+                            <div className="alert-actions" style={{ display: 'flex', gap: '0.8rem' }}>
+                                {alertItem.alertType === 'NOTIFICATION' ? (
                                     <>
-                                        <button onClick={() => handleAction(notif.id, 'Accept')} className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Accept</button>
-                                        <button onClick={() => alert('Feature coming soon: Suggesting alternative time.')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Suggest Alt Time</button>
+                                        <button className="btn btn-primary btn-sm" onClick={() => handleAction(alertItem.id, 'Accept')}>Accept</button>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => handleAction(alertItem.id, 'Dismiss')}>Dismiss</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button className="btn btn-primary btn-sm" onClick={() => onReply(alertItem.senderId)}>💬 Reply</button>
+                                        <button className="btn btn-secondary btn-sm">Archive</button>
                                     </>
                                 )}
-                                <button onClick={() => handleAction(notif.id, 'Snooze')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Snooze</button>
-                                <button onClick={() => handleAction(notif.id, 'Dismiss')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', color: '#dc2626' }}>Dismiss</button>
                             </div>
                         </div>
                     ))
@@ -691,7 +725,6 @@ export default function NurseDashboard({ user }) {
                                             alert('Vitals recorded successfully!');
 
                                             // [NEW] Real-time Socket Notification to Patient
-                                            const { getSocket } = require('@/lib/socket');
                                             const socket = getSocket();
                                             if (socket) {
                                                 socket.emit('send_notification', {
@@ -1019,9 +1052,17 @@ export default function NurseDashboard({ user }) {
                     </div>
                 )}
 
-                {/* Alerts Tab */}
+                {/* Alerts & Messages Tab */}
                 {activeTab === 'alerts' && (
-                    <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                    <AlertsView
+                        professionalName={user.name}
+                        role={user.role}
+                        professionalId={user.id}
+                        onReply={(senderId) => {
+                            setSelectedPatientId(senderId);
+                            setActiveTab('communication');
+                        }}
+                    />
                 )}
 
                 <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '2px dashed #eee', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>

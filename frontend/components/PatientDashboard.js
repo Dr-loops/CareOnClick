@@ -10,7 +10,7 @@ import { useVitals } from '@/lib/hooks/useClinicalData';
 // import { usePaystackPayment } from 'react-paystack'; // Causing SSR issues, removed as we use PaystackButton component now
 import { savePatientProfile, KEYS } from '@/lib/global_sync';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
-import { getSocket } from '@/lib/socket'; // eslint-disable-line no-unused-vars
+import { getSocket } from '@/lib/socket';
 import { analyzeResult, analyzeBP } from '@/lib/medical_analysis';
 import Toast from './Toast';
 
@@ -1477,67 +1477,110 @@ export default function PatientDashboard({ user }) {
                     <div className="card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <h2>Alerts & Messages</h2>
-                            <button className="btn btn-secondary" onClick={fetchMessages}>REFRESH ↻</button>
+                            <button className="btn btn-secondary" onClick={() => { fetchMessages(); fetchAppointments(); fetchRecords(); }}>REFRESH ↻</button>
                         </div>
 
-                        {loadingMessages ? <p>Loading messages...</p> : (
+                        {loadingMessages ? <p>Loading alerts...</p> : (
                             <div className="flex flex-col gap-4">
-                                {messages.length === 0 ? (
-                                    <p className="text-gray-500 text-center py-10">No messages or alerts.</p>
-                                ) : (
-                                    messages.map(msg => (
-                                        <div key={msg.id} style={{
+                                {(() => {
+                                    // Merge Messages, Appointments, and Records into a unified timeline
+                                    const allAlerts = [
+                                        ...messages.map(m => ({
+                                            ...m,
+                                            alertType: 'MESSAGE',
+                                            displayTitle: `Message from ${m.senderName}`,
+                                            displayMessage: m.content,
+                                            displayTime: m.timestamp || m.createdAt,
+                                        })),
+                                        ...apiAppointments
+                                            .filter(a => a.status === 'Upcoming' || a.status === 'Pending')
+                                            .map(a => ({
+                                                id: `app-${a.id}`,
+                                                alertType: 'APPOINTMENT',
+                                                displayTitle: `Appointment: ${a.status}`,
+                                                displayMessage: `Session with ${a.professionalName} on ${new Date(a.date).toLocaleDateString()} at ${a.time}`,
+                                                displayTime: a.updatedAt || a.date,
+                                                linkTab: 'appointments'
+                                            })),
+                                        ...apiRecords.slice(0, 5).map(r => ({
+                                            id: `rec-${r.id}`,
+                                            alertType: 'RECORD',
+                                            displayTitle: 'New Health Record Available',
+                                            displayMessage: `${r.fileName} published by ${r.professionalName}`,
+                                            displayTime: r.timestamp || r.date,
+                                            linkTab: 'records'
+                                        }))
+                                    ].sort((a, b) => new Date(b.displayTime) - new Date(a.displayTime));
+
+                                    if (allAlerts.length === 0) {
+                                        return <p className="text-gray-500 text-center py-10">No messages or alerts.</p>;
+                                    }
+
+                                    return allAlerts.map(alertItem => (
+                                        <div key={alertItem.id} style={{
                                             padding: '1.5rem',
                                             borderRadius: '8px',
-                                            border: msg.type === 'ALERT' ? '2px solid #fee2e2' : '1px solid #e2e8f0',
-                                            background: msg.type === 'ALERT' ? '#fef2f2' : '#ffffff',
+                                            border: alertItem.type === 'ALERT' ? '2px solid #fee2e2' : '1px solid #e2e8f0',
+                                            background: alertItem.type === 'ALERT' ? '#fef2f2' : '#ffffff',
                                             marginBottom: '1rem'
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                                 <span className="font-bold flex flex-col gap-1">
-                                                    {msg.type === 'ALERT' && <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '5px' }}>⚠️ URGENT ALERT</span>}
+                                                    {alertItem.type === 'ALERT' && <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '5px' }}>⚠️ URGENT ALERT</span>}
                                                     <span style={{ fontSize: '0.95rem', color: '#334155' }}>
-                                                        From: <strong>{msg.senderName}</strong> <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal', textTransform: 'capitalize' }}>({msg.role?.toLowerCase() || 'staff'})</span>
+                                                        {alertItem.displayTitle}
+                                                        {alertItem.alertType === 'MESSAGE' && (
+                                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal', textTransform: 'capitalize' }}> ({alertItem.role?.toLowerCase() || 'staff'})</span>
+                                                        )}
                                                     </span>
                                                 </span>
-                                                <span className="text-gray-500 text-sm">{new Date(msg.createdAt).toLocaleString()}</span>
+                                                <span className="text-gray-500 text-sm">{new Date(alertItem.displayTime).toLocaleString()}</span>
                                             </div>
-                                            <p style={{ fontSize: '1.1rem', color: msg.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0' }}>
-                                                {msg.content}
+                                            <p style={{ fontSize: '1.1rem', color: alertItem.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0' }}>
+                                                {alertItem.displayMessage}
                                             </p>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                                                Type: {msg.type}
-                                            </div>
 
                                             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-                                                <button
-                                                    onClick={() => {
-                                                        if (replyingTo === msg.id) {
-                                                            setReplyingTo(null);
-                                                        } else {
-                                                            setReplyingTo(msg.id);
-                                                            setReplyContent('');
-                                                        }
-                                                    }}
-                                                    className="btn"
-                                                    style={{ border: '1px solid #e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#475569' }}
-                                                >
-                                                    {replyingTo === msg.id ? 'Cancel' : '💬 Reply'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteMessage(msg.id)}
-                                                    className="btn"
-                                                    style={{ border: '1px solid #fee2e2', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#dc2626' }}
-                                                >
-                                                    🗑️ Delete
-                                                </button>
+                                                {alertItem.alertType === 'MESSAGE' ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (replyingTo === alertItem.id) {
+                                                                    setReplyingTo(null);
+                                                                } else {
+                                                                    setReplyingTo(alertItem.id);
+                                                                    setReplyContent('');
+                                                                }
+                                                            }}
+                                                            className="btn"
+                                                            style={{ border: '1px solid #e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#475569' }}
+                                                        >
+                                                            {replyingTo === alertItem.id ? 'Cancel' : '💬 Reply'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteMessage(alertItem.id)}
+                                                            className="btn"
+                                                            style={{ border: '1px solid #fee2e2', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#dc2626' }}
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setActiveTab(alertItem.linkTab)}
+                                                        className="btn btn-secondary"
+                                                        style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            {replyingTo === msg.id && (
+                                            {replyingTo === alertItem.id && (
                                                 <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                                     <textarea
                                                         className="input"
-                                                        placeholder={`Reply to ${msg.senderName}...`}
+                                                        placeholder={`Reply to ${alertItem.senderName}...`}
                                                         value={replyContent}
                                                         onChange={(e) => setReplyContent(e.target.value)}
                                                         style={{ width: '100%', minHeight: '80px', marginBottom: '0.8rem', padding: '0.8rem' }}
@@ -1546,7 +1589,7 @@ export default function PatientDashboard({ user }) {
                                                         <button
                                                             className="btn btn-primary"
                                                             disabled={isSendingReply || !replyContent.trim()}
-                                                            onClick={() => handleSendReply(msg.senderId, msg)}
+                                                            onClick={() => handleSendReply(alertItem.senderId, alertItem)}
                                                             style={{ fontSize: '0.85rem', padding: '0.4rem 1.2rem' }}
                                                         >
                                                             {isSendingReply ? 'Sending...' : 'Send Reply'}
@@ -1555,8 +1598,8 @@ export default function PatientDashboard({ user }) {
                                                 </div>
                                             )}
                                         </div>
-                                    ))
-                                )}
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>

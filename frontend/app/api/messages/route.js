@@ -13,22 +13,56 @@ export async function GET(request) {
 
         const { searchParams } = new URL(request.url);
         const patientId = searchParams.get('patientId');
+        const roomId = searchParams.get('roomId');
         const currentUserId = session.user.id;
 
-        // Fetch messages where the user is either the sender or recipient
-        // If patientId is provided (e.g. from an admin/prof view), we filter for that patient's context.
-        const messages = await prisma.message.findMany({
-            where: patientId ? {
+        // Filtering logic:
+        // 1. If roomId is provided, it's a room/collaboration chat.
+        // 2. If patientId is provided AND we're in a P2P context (e.g. CommunicationHub), 
+        //    we should ideally filter for the conversation between session user and patientId.
+        //    However, to maintain compatibility with existing 'CollaborationTab' which uses patientId as RoomId:
+
+        let whereClause = {};
+
+        if (roomId) {
+            // Room-based chat (e.g. Collaboration for a specific patient)
+            whereClause = {
                 OR: [
-                    { recipientId: patientId },
-                    { senderId: patientId }
+                    { recipientId: roomId },
+                    { senderId: roomId }
                 ]
-            } : {
+            };
+        } else if (patientId) {
+            // Check if 'direct' flag is present for strict P2P
+            const direct = searchParams.get('direct') === 'true';
+            if (direct) {
+                whereClause = {
+                    OR: [
+                        { AND: [{ senderId: currentUserId }, { recipientId: patientId }] },
+                        { AND: [{ senderId: patientId }, { recipientId: currentUserId }] }
+                    ]
+                };
+            } else {
+                // Legacy support/Broad view (Admin/Nurse viewing all patient messages)
+                whereClause = {
+                    OR: [
+                        { recipientId: patientId },
+                        { senderId: patientId }
+                    ]
+                };
+            }
+        } else {
+            // General inbox for the current user
+            whereClause = {
                 OR: [
                     { recipientId: currentUserId },
                     { senderId: currentUserId }
                 ]
-            },
+            };
+        }
+
+        const messages = await prisma.message.findMany({
+            where: whereClause,
             orderBy: { timestamp: 'asc' }
         });
 

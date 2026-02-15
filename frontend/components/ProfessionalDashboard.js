@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getSocket } from '@/lib/socket'; // eslint-disable-line no-unused-vars
+import { getSocket } from '@/lib/socket';
 
 import {
     Calendar, Users, Activity, FileText, MessageSquare,
@@ -42,7 +42,10 @@ import VideoConsultation from './VideoConsultation';
 import CommunicationHub from './CommunicationHub';
 import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW]
 
-const AlertsView = ({ professionalName, role, professionalId, apiAppointments = [], onRefresh }) => {
+const AlertsView = ({ professionalName, role, professionalId, apiAppointments = [], onRefresh, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loadingMessages, setLoadingMessages] = useState(false);
+
     // 1. Pending Appointments (Source of Truth: API)
     const pendingAppointments = apiAppointments.filter(a =>
         a.status === 'Pending' &&
@@ -55,6 +58,43 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
         (n.professionalName === professionalName || n.recipientId === role || n.recipientId === professionalId || n.recipientId === 'STAFF') &&
         n.status !== 'Dismissed'
     );
+
+    const fetchMessages = async () => {
+        setLoadingMessages(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                const incoming = data.filter(m => m.recipientId === professionalId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Message error", e);
+        } finally {
+            setLoadingMessages(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = getSocket();
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+                if (onRefresh) onRefresh();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+            socket.on('appointment_change', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+                socket.off('appointment_change', handleUpdate);
+            };
+        }
+    }, [professionalId, onRefresh]);
 
     const handleAppointmentAction = async (id, action) => {
         const newStatus = action === 'Accept' ? 'Upcoming' : 'Cancelled';
@@ -72,7 +112,6 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
             if (res.ok) {
                 alert(`Appointment ${action}ed successfully.`);
 
-                // [NEW] Emit Real-time Socket Notification to Patient
                 const app = apiAppointments.find(a => a.id === id);
                 const socket = getSocket();
                 if (socket && app) {
@@ -86,7 +125,6 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
                     });
                 }
 
-                // [NEW] Audit Log
                 logAudit({
                     actorName: professionalName || 'Professional',
                     action: `${action.toUpperCase()}ED APPOINTMENT`,
@@ -113,14 +151,35 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
         }
     };
 
+    const generalAlerts = [
+        ...myNotifications.map(n => ({ ...n, alertType: 'NOTIFICATION' })),
+        ...messages.map(m => ({
+            id: m.id,
+            title: `Message from ${m.senderName}`,
+            message: m.content,
+            timestamp: m.timestamp,
+            status: 'Unread',
+            type: 'CHAT',
+            senderId: m.senderId,
+            alertType: 'MESSAGE'
+        }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
     return (
-        <Card title="Recent Alerts & Notifications 🔔">
+        <Card title={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span>Recent Alerts & Messages 🔔</span>
+                <Button variant="secondary" size="sm" onClick={fetchMessages} disabled={loadingMessages}>
+                    {loadingMessages ? '...' : '↻ Refresh'}
+                </Button>
+            </div>
+        }>
             <p style={{ color: 'var(--color-grey-500)', marginBottom: '1.5rem' }}>
-                Manage pending appointment requests and system notifications.
+                Manage pending appointments, system alerts, and staff messages.
             </p>
 
             <div className="alerts-container">
-                {pendingAppointments.length === 0 && myNotifications.length === 0 ? (
+                {pendingAppointments.length === 0 && generalAlerts.length === 0 ? (
                     <div className="alert-empty-state">
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                         <h4>No new alerts</h4>
@@ -160,24 +219,34 @@ const AlertsView = ({ professionalName, role, professionalId, apiAppointments = 
                             </div>
                         )}
 
-                        {/* General Notifications Section */}
-                        {myNotifications.map(notif => (
-                            <Card key={notif.id} className="alert-card" style={{
-                                borderColor: notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981',
-                                background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
-                                opacity: 0.9
+                        {/* Merged Notifications & Messages Section */}
+                        {generalAlerts.map(alertItem => (
+                            <Card key={alertItem.id} className="alert-card" style={{
+                                borderColor: alertItem.alertType === 'MESSAGE' ? '#8b5cf6' : (alertItem.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981'),
+                                background: alertItem.status === 'Unread' ? '#f0f9ff' : 'white',
+                                opacity: 1,
+                                marginBottom: '1rem'
                             }}>
                                 <div className="alert-header">
                                     <div>
-                                        <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{notif.title}</h4>
-                                        <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
+                                        <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{alertItem.title}</h4>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(alertItem.timestamp).toLocaleString()}</p>
                                     </div>
-                                    <Badge variant="neutral">{notif.status}</Badge>
+                                    <Badge variant={alertItem.alertType === 'MESSAGE' ? 'secondary' : 'neutral'}>{alertItem.status}</Badge>
                                 </div>
-                                <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                                <p style={{ margin: '0 0 1rem 0' }}>{alertItem.message}</p>
                                 <div className="alert-actions">
-                                    <Button onClick={() => handleNotificationAction(notif.id, 'Dismiss')} variant="secondary" size="sm">Dismiss</Button>
-                                    <Button onClick={() => handleNotificationAction(notif.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
+                                    {alertItem.alertType === 'NOTIFICATION' ? (
+                                        <>
+                                            <Button onClick={() => handleNotificationAction(alertItem.id, 'Dismiss')} variant="secondary" size="sm">Dismiss</Button>
+                                            <Button onClick={() => handleNotificationAction(alertItem.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Button onClick={() => onReply(alertItem.senderId)} variant="primary" size="sm">💬 Reply</Button>
+                                            <Button variant="secondary" size="sm">Archive</Button>
+                                        </>
+                                    )}
                                 </div>
                             </Card>
                         ))}
@@ -1553,6 +1622,10 @@ export default function ProfessionalDashboard({ user }) {
                                     professionalId={user.id}
                                     apiAppointments={apiAppointments}
                                     onRefresh={fetchApiData}
+                                    onReply={(id) => {
+                                        setSelectedPatientId(id);
+                                        setActiveLabTab('communication');
+                                    }}
                                 />
                             )
                         }
@@ -1568,6 +1641,10 @@ export default function ProfessionalDashboard({ user }) {
                                 professionalId={user.id}
                                 apiAppointments={apiAppointments}
                                 onRefresh={fetchApiData}
+                                onReply={(id) => {
+                                    setSelectedPatientId(id);
+                                    setActiveLabTab('communication');
+                                }}
                             />
                         ) : activeLabTab === 'patient-records' ? (
                             <Card>

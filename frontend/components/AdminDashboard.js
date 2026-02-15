@@ -22,9 +22,103 @@ const colors = {
     textLight: '#64748b', // Slate 500
 };
 
+const AlertsView = ({ userName, role, userId, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchMessages = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                // Filter for messages where I am the recipient
+                const incoming = data.filter(m => m.recipientId === userId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Failed to fetch messages", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = typeof window !== 'undefined' ? require('@/lib/socket').getSocket() : null;
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+            };
+        }
+    }, [userId]);
+
+    return (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>Recent Alerts & Messages 🔔</h3>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' }}>Stay updated with staff communications and patient requests.</p>
+                </div>
+                <button
+                    onClick={fetchMessages}
+                    disabled={loading}
+                    style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}
+                >
+                    {loading ? '...' : '↻ Refresh'}
+                </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {messages.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📭</div>
+                        <h4 style={{ fontWeight: 'bold' }}>No new messages</h4>
+                        <p style={{ color: '#64748b' }}>Your inbox is clear.</p>
+                    </div>
+                ) : (
+                    messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(m => (
+                        <div key={m.id} style={{
+                            padding: '20px',
+                            background: 'white',
+                            borderRadius: '12px',
+                            border: '1px solid #eee',
+                            borderLeft: '5px solid #0ea5e9',
+                            position: 'relative'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <h4 style={{ margin: 0, fontWeight: 'bold' }}>Message from {m.senderName}</h4>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{new Date(m.timestamp).toLocaleString()}</span>
+                            </div>
+                            <p style={{ margin: '0 0 16px 0', color: '#334155', lineHeight: 1.5 }}>{m.content}</p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => onReply(m.senderId)}
+                                    style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: '#0ea5e9', color: 'white', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+                                >
+                                    💬 Reply
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
+
 export default function AdminDashboard({ user }) {
     useGlobalSync();
     const [activeTab, setActiveTab] = useState('overview');
+    const [selectedChatTarget, setSelectedChatTarget] = useState(null);
     const [emailComposerData, setEmailComposerData] = useState(null); // { email, name }
     const [expandedBookingGroups, setExpandedBookingGroups] = useState({});
 
@@ -564,6 +658,7 @@ export default function AdminDashboard({ user }) {
                         <TabButton id="emails" label="Logs" icon="📨" />
                         <TabButton id="communication" label="Communication" icon="💬" />
                         <TabButton id="mailbox" label="Inbox" icon="📥" />
+                        <TabButton id="alerts" label="Alerts" icon="🔔" />
                         <TabButton id="site-editor" label="Site" icon="⚙️" />
                     </div>
                 </div>
@@ -725,13 +820,26 @@ export default function AdminDashboard({ user }) {
                                                 <td style={tdStyle}>
                                                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{u.name}</div>
                                                     <div style={{ color: colors.textLight }}>{u.email}</div>
-                                                    <div
-                                                        onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
-                                                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.text, fontSize: '0.9rem' }}
-                                                        title="Send Official Mail"
-                                                    >
-                                                        <span>📧</span>
-                                                        <span style={{ textDecoration: 'underline', color: colors.primary }}>{u.email}</span>
+                                                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                                                        <div
+                                                            onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
+                                                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.text, fontSize: '0.9rem' }}
+                                                            title="Send Official Mail"
+                                                        >
+                                                            <span>📧</span>
+                                                            <span style={{ textDecoration: 'underline', color: colors.primary }}>Email</span>
+                                                        </div>
+                                                        <div
+                                                            onClick={() => {
+                                                                setSelectedChatTarget(u.id);
+                                                                setActiveTab('communication');
+                                                            }}
+                                                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.primary, fontSize: '0.9rem', fontWeight: 'bold' }}
+                                                            title="Chat Internally"
+                                                        >
+                                                            <span>💬</span>
+                                                            <span style={{ textDecoration: 'underline' }}>Chat</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td style={tdStyle}>
@@ -1195,13 +1303,26 @@ export default function AdminDashboard({ user }) {
                                                                 </div>
                                                             )}
 
-                                                            <div
-                                                                onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
-                                                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}
-                                                                title="Send Official Mail"
-                                                            >
-                                                                <span>📧</span>
-                                                                <span style={{ textDecoration: 'underline', color: colors.primary }}>{u.email}</span>
+                                                            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                                                                <div
+                                                                    onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
+                                                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}
+                                                                    title="Send Official Mail"
+                                                                >
+                                                                    <span>📧</span>
+                                                                    <span style={{ textDecoration: 'underline', color: colors.primary }}>Email</span>
+                                                                </div>
+                                                                <div
+                                                                    onClick={() => {
+                                                                        setSelectedChatTarget(u.id);
+                                                                        setActiveTab('communication');
+                                                                    }}
+                                                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.primary, fontSize: '0.95rem', fontWeight: 'bold' }}
+                                                                    title="Chat Internally"
+                                                                >
+                                                                    <span>💬</span>
+                                                                    <span style={{ textDecoration: 'underline' }}>Chat</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1904,7 +2025,27 @@ export default function AdminDashboard({ user }) {
                 {/* COMMUNICATION TAB */}
                 {(activeTab === 'communication') && (
                     <div style={cardStyle}>
-                        <CommunicationHub user={user} patients={dbUsers.filter(u => u.role === 'patient')} staff={allStaff} />
+                        <CommunicationHub
+                            user={user}
+                            patients={dbUsers.filter(u => u.role === 'patient')}
+                            staff={allStaff}
+                            initialPatientId={selectedChatTarget}
+                        />
+                    </div>
+                )}
+
+                {/* ALERTS TAB */}
+                {activeTab === 'alerts' && (
+                    <div className="animate-fade-in">
+                        <AlertsView
+                            userName={user.name}
+                            role={user.role}
+                            userId={user.id}
+                            onReply={(targetId) => {
+                                setSelectedChatTarget(targetId);
+                                setActiveTab('communication');
+                            }}
+                        />
                     </div>
                 )}
 

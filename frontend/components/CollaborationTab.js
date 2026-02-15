@@ -244,9 +244,18 @@ export default function CollaborationTab({ user, selectedPatientId }) {
     };
 
     // ... (Delete/Keypress/RenderAttachment remain) ...
-    const handleDelete = (id) => {
-        if (confirm('Delete this message locally? (Server sync pending)')) {
-            setMessages(prev => prev.filter(m => m.id !== id));
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this message?')) return;
+        try {
+            const res = await fetch(`/api/messages?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages(prev => prev.filter(m => m.id !== id));
+            } else {
+                alert('Failed to delete message');
+            }
+        } catch (e) {
+            console.error("Error deleting message", e);
+            alert('An error occurred.');
         }
     };
 
