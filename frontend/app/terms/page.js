@@ -39,7 +39,7 @@ export default function TermsOfService() {
 
                     <h2>4. Professional Ethics & Data</h2>
                     <p>
-                        All professionals on our platform (Physicians, Nurses, Lab Scientists, Pharmacists, Dieticians, and Psychologists) are bound by professional ethics and our strict internal Data Policy regarding the handling of your patient information.
+                        All professionals on our platform are bound by professional ethics and our strict internal Data Policy. We emphasize that **Lab Doctors (Lab Scientists)** and **Physicians** maintain equal clinical parity on this site regarding their authority to interpret results, provide consultations, and manage your clinical data. This also extends to our Nurses, Pharmacists, Dieticians, and Psychologists within their respective scopes of practice.
                     </p>
 
                     <h2>5. Payment & Refunds</h2>

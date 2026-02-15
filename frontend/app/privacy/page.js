@@ -23,10 +23,9 @@ export default function PrivacyPolicy() {
                     </ul>
 
                     <h2>3. Professional Data Access & Protection</h2>
-                    <p>To provide quality healthcare, data access is strictly governed based on professional roles:</p>
+                    <p>To provide quality healthcare, data access is strictly governed based on professional roles. We recognize the critical role of diagnostic expertise in patient care:</p>
                     <ul>
-                        <li><strong>Physicians & Nurses</strong>: Have access to your clinical records, vitals, and medical history to provide direct care and consultations.</li>
-                        <li><strong>Lab Scientists & Lab Doctors</strong>: Access is restricted to laboratory requests and the uploading of diagnostic results.</li>
+                        <li><strong>Physicians, Nurses, and Lab Doctors (Lab Scientists)</strong>: These professionals have comprehensive access to your clinical records, vitals, medical history, and diagnostic reports. They are authorized to provide direct consultations, interpret results, and advise on the next steps of your medical journey.</li>
                         <li><strong>Pharmacists</strong>: Access is limited to your prescriptions and relevant medication history for dispensing and safety checks.</li>
                         <li><strong>Dieticians & Psychologists</strong>: Access is restricted to specific specialty notes and dietary or mental health records relevant to your consultation.</li>
                         <li><strong>System Administrators</strong>: Access is limited to technical support, security auditing, and system maintenance. Admins do not access your clinical data except for necessary technical troubleshooting.</li>
