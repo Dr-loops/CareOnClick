@@ -328,6 +328,8 @@ export default function ProfessionalDashboard({ user }) {
     const [manualEntry, setManualEntry] = useState({
         testName: '', resultValue: '', unit: '', normalRange: '', flag: '', notes: ''
     });
+    const [labComments, setLabComments] = useState(''); // [NEW] For validation comments
+
 
 
 
@@ -400,6 +402,46 @@ export default function ProfessionalDashboard({ user }) {
             fetchTasks();
         }
     }, [activeLabTab, user.id]);
+
+
+    // [NEW] Lab Draft Management
+    useEffect(() => {
+        if (selectedPatientId && activeTest) {
+            const draftKey = `lab_draft_${selectedPatientId}_${activeTest}`;
+            const savedDraft = localStorage.getItem(draftKey);
+            if (savedDraft) {
+                try {
+                    const { results, comments } = JSON.parse(savedDraft);
+                    setTestResults(results || {});
+                    setLabComments(comments || '');
+                } catch (e) { console.error("Draft load error", e); }
+            } else {
+                // Clear if no draft
+                const defaults = {};
+                const testSource = isScientist ? LAB_TESTS[activeLabTab] : CLINICAL_MODULES[user.role];
+                const currentTestData = testSource?.find(t => t.id === activeTest);
+                currentTestData?.parameters.forEach(p => defaults[p.id] = p.default || '');
+                setTestResults(defaults);
+                setLabComments('');
+            }
+        }
+    }, [selectedPatientId, activeTest]);
+
+    const saveDraft = () => {
+        if (!selectedPatientId || !activeTest) return;
+        const draftKey = `lab_draft_${selectedPatientId}_${activeTest}`;
+        localStorage.setItem(draftKey, JSON.stringify({
+            results: testResults,
+            comments: labComments
+        }));
+        setToast({ message: 'Draft saved successfully!', type: 'success' });
+    };
+
+    const clearDraft = (patientId, testId) => {
+        const draftKey = `lab_draft_${patientId}_${testId}`;
+        localStorage.removeItem(draftKey);
+    };
+
 
     const handleCreateTask = async (e) => {
         e.preventDefault();
@@ -683,7 +725,8 @@ export default function ProfessionalDashboard({ user }) {
                 structuredResults: activeTest ? {
                     testId: activeTest,
                     testName: activeTestData?.name,
-                    results: testResults
+                    results: testResults,
+                    comments: labComments
                 } : null,
                 scientist: user.name,
                 professionalRole: user.role
@@ -722,9 +765,13 @@ export default function ProfessionalDashboard({ user }) {
 
                 alert(`Result successfully DISPATCHED to Patient ${pathSearch}!`);
 
+                // CLEANUP
+                clearDraft(selectedPatient.id, activeTest); // Clear draft on success
+
                 // RESET
                 setActiveTest(null);
                 setTestResults({});
+                setLabComments('');
                 setLastUploaded(null);
             } catch (err) {
                 alert(`Dispatch FAILED: ${err.message}. Please check the Path Number.`);
@@ -789,7 +836,7 @@ export default function ProfessionalDashboard({ user }) {
         <DashboardLayout
             role={currentUser.role}
             userName={currentUser.name}
-            avatarUrl={currentUser.avatarUrl} // [NEW]
+            avatarUrl={currentUser.avatarUrl || currentUser.image} // [FIX] Support both field names
             sidebarItems={sidebarItems}
             activeTab={activeLabTab}
             onTabChange={setActiveLabTab}
@@ -1955,7 +2002,11 @@ export default function ProfessionalDashboard({ user }) {
                                                     <>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                             <h3 style={{ margin: 0 }}>{currentTestData?.icon} {currentTestData?.name}</h3>
-                                                            <Button onClick={() => setActiveTest(null)} variant="secondary" size="sm">Cancel</Button>
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                <Button onClick={saveDraft} variant="secondary" size="sm">💾 Save Draft</Button>
+                                                                <Button onClick={() => setActiveTest(null)} variant="secondary" size="sm">Cancel</Button>
+                                                            </div>
+
                                                             <Button
                                                                 variant="primary"
                                                                 size="sm"
@@ -1988,8 +2039,10 @@ export default function ProfessionalDashboard({ user }) {
                                                                                 testId: activeTest,
                                                                                 testName: currentTestData?.name,
                                                                                 results: testResults,
-                                                                                metadata: metadata
+                                                                                metadata: metadata,
+                                                                                comments: labComments // [NEW] Include comments
                                                                             }
+
                                                                         });
 
                                                                         alert(`Results for ${currentTestData?.name} dispatched to patient record!`);
@@ -2060,7 +2113,18 @@ export default function ProfessionalDashboard({ user }) {
                                                                     </div>
                                                                 );
                                                             })}
+                                                            <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
+                                                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>👨‍💻 Comments & Recommendation</label>
+                                                                <textarea
+                                                                    className="input-field"
+                                                                    placeholder="Enter clinical validation comments or recommendations here..."
+                                                                    value={labComments}
+                                                                    onChange={(e) => setLabComments(e.target.value)}
+                                                                    style={{ width: '100%', minHeight: '120px', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1rem' }}
+                                                                />
+                                                            </div>
                                                         </div>
+
                                                     </>
                                                 );
                                             })()}
