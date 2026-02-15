@@ -920,7 +920,13 @@ export default function AdminDashboard({ user }) {
                                                 <div style={{ fontSize: '1.2rem', fontFamily: 'monospace', fontWeight: 'bold', color: colors.primary, marginBottom: '24px' }}>{patient.pathNumber || 'PENDING'}</div>
 
                                                 <div style={{ color: colors.textLight, fontSize: '0.9rem', uppercase: 'true', fontWeight: 'bold', marginBottom: '4px' }}>AGE / SEX</div>
-                                                <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>{p.age || 'N/A'} / {p.sex || p.gender || 'N/A'}</div>
+                                                <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>
+                                                    {(() => {
+                                                        const age = p.age || (p.dateOfBirth ? Math.floor((new Date() - new Date(p.dateOfBirth)) / 31557600000) : 'N/A');
+                                                        const sex = p.sex || p.gender || 'N/A';
+                                                        return `${age} / ${sex}`;
+                                                    })()}
+                                                </div>
 
                                                 <div style={{ color: colors.textLight, fontSize: '0.9rem', uppercase: 'true', fontWeight: 'bold', marginBottom: '4px' }}>ADDRESS</div>
                                                 <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>{p.address || 'N/A'}</div>
@@ -1653,7 +1659,8 @@ export default function AdminDashboard({ user }) {
                                         result: formData.get('result'),
                                         unit: formData.get('unit'),
                                         range: formData.get('range'),
-                                        flag: formData.get('flag')
+                                        flag: formData.get('flag'),
+                                        comments: formData.get('comments')
                                     })
                                 };
                                 handleSaveRecord(newRecord);
@@ -1746,6 +1753,11 @@ export default function AdminDashboard({ user }) {
                                             )}
 
                                             <div>
+                                                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Professional Comments / Recommendations</label>
+                                                <textarea name="comments" defaultValue={JSON.parse(editingRecord.structuredData || '{}').comments} placeholder="Enter professional advice or recommendations..." rows="3" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit' }} />
+                                            </div>
+
+                                            <div>
                                                 <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Attachment URL (Optional)</label>
                                                 <input name="fileUrl" defaultValue={editingRecord.fileUrl} placeholder="https://..." style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc' }} />
                                             </div>
@@ -1765,7 +1777,7 @@ export default function AdminDashboard({ user }) {
                 {/* VIEW RECORD MODAL (Request #6: Download/Print) */}
                 {viewingRecord && (
                     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
-                        <div style={{ background: 'white', padding: '0', borderRadius: '16px', width: '700px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                        <div id="print-area" style={{ background: 'white', padding: '0', borderRadius: '16px', width: '700px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ padding: '32px', background: 'white' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '32px', borderBottom: '2px solid #000', paddingBottom: '24px' }}>
                                     <div>
@@ -1781,10 +1793,20 @@ export default function AdminDashboard({ user }) {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '32px' }}>
                                     <div>
                                         <div style={{ fontWeight: 'bold', color: '#666', fontSize: '0.85rem' }}>PATIENT</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{viewingRecord.patientName}</div>
-                                        <div>ID: {dbUsers.find(u => u.name === viewingRecord.patientName)?.pathNumber || 'N/A'}</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{viewingRecord.patientName || (dbUsers.find(u => u.id === viewingRecord.patientId)?.name) || 'Unknown Patient'}</div>
+                                        {(() => {
+                                            const patient = dbUsers.find(u => u.name === viewingRecord.patientName || u.id === viewingRecord.patientId);
+                                            const pProfile = patient?.profile || {};
+                                            const age = pProfile.age || (pProfile.dateOfBirth ? Math.floor((new Date() - new Date(pProfile.dateOfBirth)) / 31557600000) : 'N/A');
+                                            const sex = pProfile.sex || pProfile.gender || 'N/A';
+                                            return (
+                                                <div style={{ fontSize: '0.9rem', color: '#444' }}>
+                                                    ID: {patient?.pathNumber || 'N/A'} | {age} | {sex}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
-                                    <div>
+                                    <div style={{ textAlign: 'right' }}>
                                         <div style={{ fontWeight: 'bold', color: '#666', fontSize: '0.85rem' }}>PROVIDER</div>
                                         <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{viewingRecord.professionalName}</div>
                                         <div>{viewingRecord.facility || 'Main Hospital'}</div>
@@ -1867,6 +1889,21 @@ export default function AdminDashboard({ user }) {
                                             })()}
                                         </div>
                                     )}
+
+                                    {(() => {
+                                        try {
+                                            const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : (viewingRecord.structuredData || viewingRecord.structuredResults);
+                                            if (s && (s.comments || s.notes || s.plan)) {
+                                                return (
+                                                    <div style={{ marginTop: '24px', padding: '20px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: '#92400e', fontWeight: 'bold', textTransform: 'uppercase' }}>Professional Comments & Recommendations</h4>
+                                                        <p style={{ margin: 0, lineHeight: 1.6, color: '#92400e', whiteSpace: 'pre-wrap' }}>{s.comments || s.notes || s.plan}</p>
+                                                    </div>
+                                                );
+                                            }
+                                        } catch (e) { }
+                                        return null;
+                                    })()}
                                 </div>
 
                                 {viewingRecord.fileUrl && (
@@ -1878,10 +1915,34 @@ export default function AdminDashboard({ user }) {
                                     </div>
                                 )}
 
-                                <div style={{ borderTop: '2px solid #eee', paddingTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <div className="no-print" style={{ borderTop: '2px solid #eee', paddingTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                                     <button onClick={() => setViewingRecord(null)} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', fontWeight: 'bold', cursor: 'pointer' }}>Close</button>
                                     <button onClick={() => window.print()} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#333', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>🖨️ Print / Download PDF</button>
                                 </div>
+
+                                <style dangerouslySetInnerHTML={{
+                                    __html: `
+                                    @media print {
+                                        body * { visibility: hidden; }
+                                        .no-print { display: none !important; }
+                                        #print-area, #print-area * { visibility: visible; }
+                                        #print-area {
+                                            position: fixed;
+                                            left: 0;
+                                            top: 0;
+                                            width: 100%;
+                                            height: 100%;
+                                            background: white !important;
+                                            padding: 40px !important;
+                                            margin: 0 !important;
+                                            box-shadow: none !important;
+                                            overflow: visible !important;
+                                        }
+                                        table { border-collapse: collapse !important; width: 100% !important; }
+                                        th, td { border: 1px solid #ddd !important; padding: 12px !important; }
+                                        @page { size: auto; margin: 20mm; }
+                                    }
+                                `}} />
                             </div>
                         </div>
                     </div>
