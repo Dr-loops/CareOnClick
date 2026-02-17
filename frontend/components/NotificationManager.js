@@ -4,7 +4,7 @@ import { getSocket } from '@/lib/socket';
 import { useSession } from 'next-auth/react';
 import Toast from './Toast';
 import { Phone, PhoneOff, Video } from 'lucide-react';
-import VideoConsultation from './VideoConsultation';
+// import VideoConsultation from './VideoConsultation'; // Removed
 
 export default function NotificationManager() {
     const { data: session } = useSession();
@@ -182,14 +182,15 @@ export default function NotificationManager() {
                 </div>
             )}
 
-            {/* Video Consultation Wrapper */}
+            {/* Video Consultation Wrapper - DEPRECATED/REMOVED */}
+            {/* 
             {showVideo && (
                 <div className="fixed inset-0 z-[11000]">
                     <VideoConsultation
                         roomId={activeRoomId}
                         user={session?.user}
                     />
-                    <button
+                     <button
                         onClick={() => setShowVideo(false)}
                         className="fixed top-6 right-6 z-[12000] bg-white/10 hover:bg-white/20 text-white p-3 rounded-xl backdrop-blur-md"
                     >
@@ -197,6 +198,7 @@ export default function NotificationManager() {
                     </button>
                 </div>
             )}
+            */}
 
             {/* Permission Banner */}
             {permission === 'default' && session?.user && (

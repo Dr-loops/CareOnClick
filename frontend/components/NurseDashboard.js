@@ -18,7 +18,8 @@ import PatientList from './PatientList';
 import DictationRecorder from './DictationRecorder';
 import WhatsAppButton from './WhatsAppButton';
 import CommunicationHub from './CommunicationHub';
-import VideoConsultation from './VideoConsultation'; // [NEW]
+import VideoMethodModal from './VideoMethodModal';
+import { VideoCallService } from '@/lib/videoService';
 import ProfileModal from './ProfileModal'; // [NEW]
 import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW] Invoice Modal
 
@@ -198,6 +199,8 @@ export default function NurseDashboard({ user }) {
             }
         }
     }, [staff, user.id]);
+
+    const [showVideoModal, setShowVideoModal] = useState(false);
 
     // Vitals Entry State
     const [vitalsInput, setVitalsInput] = useState({
@@ -1020,7 +1023,21 @@ export default function NurseDashboard({ user }) {
                 {/* [NEW] Telehealth Tab */}
                 {activeTab === 'telehealth' && (
                     <div style={{ padding: '0 1rem' }}>
-                        <VideoConsultation user={user} patient={selectedPatient} />
+                        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+                            <h3>Telehealth Video Consultation</h3>
+                            <p>Start a secure video call with {selectedPatient?.name || 'the patient'} using your preferred method.</p>
+                            <button className="btn btn-primary" onClick={() => setShowVideoModal(true)}>Initiate Video Call</button>
+                        </div>
+                        {showVideoModal && (
+                            <VideoMethodModal
+                                isOpen={showVideoModal}
+                                onClose={() => setShowVideoModal(false)}
+                                onSelectMethod={(method) => {
+                                    setShowVideoModal(false);
+                                    VideoCallService.startCall(method, selectedPatient, user.name);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -1091,25 +1108,6 @@ export default function NurseDashboard({ user }) {
                 </div>
             </main>
 
-            {/* Profile Modal */}
-            {isProfileOpen && (
-                <ProfileModal
-                    user={userProfile}
-                    onClose={() => setIsProfileOpen(false)}
-                    onSave={handleProfileUpdate}
-                />
-            )}
-
-            {/* Billing Invoice Modal */}
-            {invoiceData && (
-                <BillingInvoiceModal
-                    isOpen={invoiceData.isOpen}
-                    onClose={() => setInvoiceData(null)}
-                    patient={invoiceData.patient}
-                    professionalName={user.name}
-                    professionalRole="Nurse"
-                />
-            )}
         </div>
     );
 }

@@ -32,6 +32,8 @@ export async function GET(request) {
                 email: true,
                 pathNumber: true,
                 phoneNumber: true,
+                whatsappNumber: true,
+                whatsappVerified: true,
                 profile: {
                     select: {
                         dateOfBirth: true,

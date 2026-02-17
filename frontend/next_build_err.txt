@@ -1,0 +1,703 @@
+﻿   ▲ Next.js 15.5.9
+   - Environments: .env
+
+   Creating an optimized production build ...
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (:String   
+ ) [], RemoteExce    
+ption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+
+Retrying 1/3...
+
+
+Retrying 1/3...
+
+
+Retrying 2/3...
+
+
+Retrying 2/3...
+
+
+Retrying 3/3...
+
+
+Retrying 3/3...
+[AggregateError: ] { 
+code: 'ETIMEDOUT' }
+[AggregateError: ] { 
+code: 'ETIMEDOUT' }
+Failed to compile.
+
+app\layout.js
+`next/font` error:
+Failed to fetch 
+`Montserrat` from 
+Google Fonts.
+
+app\layout.js
+`next/font` error:
+Failed to fetch 
+`Open Sans` from 
+Google Fonts.
+
+app\layout.js
+An error occurred in 
+`next/font`.
+
+NextFontError: 
+Failed to fetch 
+`Montserrat` from 
+Google Fonts.
+    at nextFontError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\@nex
+t\font\dist\next-font
+-error.js:8:17)
+    at nextFontGoogle
+FontLoader (C:\Users\
+kfryt\.gemini\antigra
+vity\scratch\dr_kals_
+virtual_hospital\node
+_modules\next\dist\co
+mpiled\@next\font\dis
+t\google\loader.js:97
+:49)
+    at process.proces
+sTicksAndRejections (
+node:internal/process
+/task_queues:103:5)
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at async C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\b
+uild\webpack\loaders\
+next-font-loader\inde
+x.js:84:87
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at 
+tryRunOrWebpackError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\webp
+ack\bundle5.js:29:316
+119)
+    at __webpack_requ
+ire_module__ (C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\dist\
+compiled\webpack\bund
+le5.js:29:131532)
+    at __nested_webpa
+ck_require_161494__ (
+C:\Users\kfryt\.gemin
+i\antigravity\scratch
+\dr_kals_virtual_hosp
+ital\node_modules\nex
+t\dist\compiled\webpa
+ck\bundle5.js:29:1309
+67)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131824
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14444)
+    at done (C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\c
+ompiled\neo-async\asy
+nc.js:1:14824)
+    at Hook.eval [as 
+callAsync] (eval at 
+create (C:\Users\kfry
+t\.gemini\antigravity
+\scratch\dr_kals_virt
+ual_hospital\node_mod
+ules\next\dist\compil
+ed\webpack\bundle5.js
+:14:9224), 
+<anonymous>:15:1)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:130687
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14402)
+    at timesSync (C:\
+Users\kfryt\.gemini\a
+ntigravity\scratch\dr
+_kals_virtual_hospita
+l\node_modules\next\d
+ist\compiled\neo-asyn
+c\async.js:1:5027)
+-- inner error --
+NextFontError: 
+Failed to fetch 
+`Montserrat` from 
+Google Fonts.
+    at nextFontError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\@nex
+t\font\dist\next-font
+-error.js:8:17)
+    at nextFontGoogle
+FontLoader (C:\Users\
+kfryt\.gemini\antigra
+vity\scratch\dr_kals_
+virtual_hospital\node
+_modules\next\dist\co
+mpiled\@next\font\dis
+t\google\loader.js:97
+:49)
+    at process.proces
+sTicksAndRejections (
+node:internal/process
+/task_queues:103:5)
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at async C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\b
+uild\webpack\loaders\
+next-font-loader\inde
+x.js:84:87
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at 
+Object.<anonymous> (C
+:\Users\kfryt\.gemini
+\antigravity\scratch\
+dr_kals_virtual_hospi
+tal\node_modules\next
+\dist\build\webpack\l
+oaders\css-loader\src
+\index.js??ruleSet[1]
+.rules[14].oneOf[2].u
+se[1]!C:\Users\kfryt\
+.gemini\antigravity\s
+cratch\dr_kals_virtua
+l_hospital\node_modul
+es\next\dist\build\we
+bpack\loaders\next-fo
+nt-loader\index.js??r
+uleSet[1].rules[14].o
+neOf[2].use[2]!C:\Use
+rs\kfryt\.gemini\anti
+gravity\scratch\dr_ka
+ls_virtual_hospital\n
+ode_modules\next\font
+\google\target.css?{"
+path":"app\\layout.js
+","import":"Montserra
+t","arguments":[{"sub
+sets":["latin"],"vari
+able":"--font-montser
+rat","display":"swap"
+}],"variableName":"mo
+ntserrat"}:1:7)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:962717
+    at Hook.eval [as 
+call] (eval at 
+create (C:\Users\kfry
+t\.gemini\antigravity
+\scratch\dr_kals_virt
+ual_hospital\node_mod
+ules\next\dist\compil
+ed\webpack\bundle5.js
+:14:9002), 
+<anonymous>:7:1)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131565
+    at 
+tryRunOrWebpackError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\webp
+ack\bundle5.js:29:316
+073)
+    at __webpack_requ
+ire_module__ (C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\dist\
+compiled\webpack\bund
+le5.js:29:131532)
+    at __nested_webpa
+ck_require_161494__ (
+C:\Users\kfryt\.gemin
+i\antigravity\scratch
+\dr_kals_virtual_hosp
+ital\node_modules\nex
+t\dist\compiled\webpa
+ck\bundle5.js:29:1309
+67)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131824
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14444)
+    at done (C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\c
+ompiled\neo-async\asy
+nc.js:1:14824)
+
+Generated code for C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\build\webpack\lo
+aders\css-loader\src\
+index.js??ruleSet[1].
+rules[14].oneOf[2].us
+e[1]!C:\Users\kfryt\.
+gemini\antigravity\sc
+ratch\dr_kals_virtual
+_hospital\node_module
+s\next\dist\build\web
+pack\loaders\next-fon
+t-loader\index.js??ru
+leSet[1].rules[14].on
+eOf[2].use[2]!C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\font\
+google\target.css?{"p
+ath":"app\\layout.js"
+,"import":"Montserrat
+","arguments":[{"subs
+ets":["latin"],"varia
+ble":"--font-montserr
+at","display":"swap"}
+],"variableName":"mon
+tserrat"}
+
+app\layout.js
+An error occurred in 
+`next/font`.
+
+NextFontError: 
+Failed to fetch 
+`Open Sans` from 
+Google Fonts.
+    at nextFontError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\@nex
+t\font\dist\next-font
+-error.js:8:17)
+    at nextFontGoogle
+FontLoader (C:\Users\
+kfryt\.gemini\antigra
+vity\scratch\dr_kals_
+virtual_hospital\node
+_modules\next\dist\co
+mpiled\@next\font\dis
+t\google\loader.js:97
+:49)
+    at process.proces
+sTicksAndRejections (
+node:internal/process
+/task_queues:103:5)
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at async C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\b
+uild\webpack\loaders\
+next-font-loader\inde
+x.js:84:87
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at 
+tryRunOrWebpackError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\webp
+ack\bundle5.js:29:316
+119)
+    at __webpack_requ
+ire_module__ (C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\dist\
+compiled\webpack\bund
+le5.js:29:131532)
+    at __nested_webpa
+ck_require_161494__ (
+C:\Users\kfryt\.gemin
+i\antigravity\scratch
+\dr_kals_virtual_hosp
+ital\node_modules\nex
+t\dist\compiled\webpa
+ck\bundle5.js:29:1309
+67)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131824
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14444)
+    at done (C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\c
+ompiled\neo-async\asy
+nc.js:1:14824)
+    at Hook.eval [as 
+callAsync] (eval at 
+create (C:\Users\kfry
+t\.gemini\antigravity
+\scratch\dr_kals_virt
+ual_hospital\node_mod
+ules\next\dist\compil
+ed\webpack\bundle5.js
+:14:9224), 
+<anonymous>:15:1)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:130687
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14402)
+    at timesSync (C:\
+Users\kfryt\.gemini\a
+ntigravity\scratch\dr
+_kals_virtual_hospita
+l\node_modules\next\d
+ist\compiled\neo-asyn
+c\async.js:1:5027)
+-- inner error --
+NextFontError: 
+Failed to fetch 
+`Open Sans` from 
+Google Fonts.
+    at nextFontError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\@nex
+t\font\dist\next-font
+-error.js:8:17)
+    at nextFontGoogle
+FontLoader (C:\Users\
+kfryt\.gemini\antigra
+vity\scratch\dr_kals_
+virtual_hospital\node
+_modules\next\dist\co
+mpiled\@next\font\dis
+t\google\loader.js:97
+:49)
+    at process.proces
+sTicksAndRejections (
+node:internal/process
+/task_queues:103:5)
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at async C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\b
+uild\webpack\loaders\
+next-font-loader\inde
+x.js:84:87
+    at async 
+Span.traceAsyncFn (C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\trace\trace.js:1
+57:20)
+    at 
+Object.<anonymous> (C
+:\Users\kfryt\.gemini
+\antigravity\scratch\
+dr_kals_virtual_hospi
+tal\node_modules\next
+\dist\build\webpack\l
+oaders\css-loader\src
+\index.js??ruleSet[1]
+.rules[14].oneOf[2].u
+se[1]!C:\Users\kfryt\
+.gemini\antigravity\s
+cratch\dr_kals_virtua
+l_hospital\node_modul
+es\next\dist\build\we
+bpack\loaders\next-fo
+nt-loader\index.js??r
+uleSet[1].rules[14].o
+neOf[2].use[2]!C:\Use
+rs\kfryt\.gemini\anti
+gravity\scratch\dr_ka
+ls_virtual_hospital\n
+ode_modules\next\font
+\google\target.css?{"
+path":"app\\layout.js
+","import":"Open_Sans
+","arguments":[{"subs
+ets":["latin"],"varia
+ble":"--font-open-san
+s","display":"swap"}]
+,"variableName":"open
+Sans"}:1:7)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:962717
+    at Hook.eval [as 
+call] (eval at 
+create (C:\Users\kfry
+t\.gemini\antigravity
+\scratch\dr_kals_virt
+ual_hospital\node_mod
+ules\next\dist\compil
+ed\webpack\bundle5.js
+:14:9002), 
+<anonymous>:7:1)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131565
+    at 
+tryRunOrWebpackError 
+(C:\Users\kfryt\.gemi
+ni\antigravity\scratc
+h\dr_kals_virtual_hos
+pital\node_modules\ne
+xt\dist\compiled\webp
+ack\bundle5.js:29:316
+073)
+    at __webpack_requ
+ire_module__ (C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\dist\
+compiled\webpack\bund
+le5.js:29:131532)
+    at __nested_webpa
+ck_require_161494__ (
+C:\Users\kfryt\.gemin
+i\antigravity\scratch
+\dr_kals_virtual_hosp
+ital\node_modules\nex
+t\dist\compiled\webpa
+ck\bundle5.js:29:1309
+67)
+    at C:\Users\kfryt
+\.gemini\antigravity\
+scratch\dr_kals_virtu
+al_hospital\node_modu
+les\next\dist\compile
+d\webpack\bundle5.js:
+29:131824
+    at 
+symbolIterator (C:\Us
+ers\kfryt\.gemini\ant
+igravity\scratch\dr_k
+als_virtual_hospital\
+node_modules\next\dis
+t\compiled\neo-async\
+async.js:1:14444)
+    at done (C:\Users
+\kfryt\.gemini\antigr
+avity\scratch\dr_kals
+_virtual_hospital\nod
+e_modules\next\dist\c
+ompiled\neo-async\asy
+nc.js:1:14824)
+
+Generated code for C:
+\Users\kfryt\.gemini\
+antigravity\scratch\d
+r_kals_virtual_hospit
+al\node_modules\next\
+dist\build\webpack\lo
+aders\css-loader\src\
+index.js??ruleSet[1].
+rules[14].oneOf[2].us
+e[1]!C:\Users\kfryt\.
+gemini\antigravity\sc
+ratch\dr_kals_virtual
+_hospital\node_module
+s\next\dist\build\web
+pack\loaders\next-fon
+t-loader\index.js??ru
+leSet[1].rules[14].on
+eOf[2].use[2]!C:\User
+s\kfryt\.gemini\antig
+ravity\scratch\dr_kal
+s_virtual_hospital\no
+de_modules\next\font\
+google\target.css?{"p
+ath":"app\\layout.js"
+,"import":"Open_Sans"
+,"arguments":[{"subse
+ts":["latin"],"variab
+le":"--font-open-sans
+","display":"swap"}],
+"variableName":"openS
+ans"}
+
+
+> Build failed 
+because of webpack 
+errors

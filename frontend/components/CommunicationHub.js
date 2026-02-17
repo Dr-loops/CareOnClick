@@ -6,7 +6,8 @@ import Button from './ui/Button';
 import PatientAutofillInputs from './ui/PatientAutofillInputs';
 // import WhatsAppButton from './WhatsAppButton'; // Unused
 import DictationRecorder from './DictationRecorder';
-import VideoConsultation from './VideoConsultation';
+import VideoMethodModal from './VideoMethodModal';
+import { VideoCallService, VIDEO_METHODS } from '@/lib/videoService';
 import { getSocket } from '@/lib/socket';
 
 export default function CommunicationHub({
@@ -162,13 +163,26 @@ export default function CommunicationHub({
             <p style={{ color: '#666', marginBottom: '1.5rem' }}>Connect with patients and staff via multiple channels.</p>
 
             {showVideoConsultation ? (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: 'black' }}>
-                    <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10000 }}>
-                        <Button variant="danger" onClick={() => setShowVideoConsultation(false)}>Close Video</Button>
-                    </div>
-                    {/* Pass User to join room with correct ID */}
-                    <VideoConsultation roomId={selectedTargetId} user={user} />
-                </div>
+                // Re-using showVideoConsultation state to show the Modal instead
+                <VideoMethodModal
+                    isOpen={showVideoConsultation}
+                    onClose={() => setShowVideoConsultation(false)}
+                    onSelectMethod={(method) => {
+                        setShowVideoConsultation(false);
+                        if (method === VIDEO_METHODS.MEET) {
+                            VideoCallService.startMeetSession().then(link => {
+                                window.open(link, '_blank');
+                                // Notify logic could go here too
+                            });
+                        } else if (method === VIDEO_METHODS.WHATSAPP) {
+                            const target = selectedTarget;
+                            const number = target?.whatsappNumber || target?.phoneNumber;
+                            const link = VideoCallService.getWhatsAppLink(number);
+                            if (link) window.open(link, '_blank');
+                            else alert("No number available for WhatsApp");
+                        }
+                    }}
+                />
             ) : (
                 <div className="comm-hub-grid">
                     <div>
@@ -245,43 +259,26 @@ export default function CommunicationHub({
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #a855f7', background: '#f3e8ff', transition: 'transform 0.2s' }}
                                 onClick={() => {
                                     if (!selectedTarget) return;
-                                    const socket = getSocket();
-                                    if (socket) {
-                                        socket.emit('call-invite', {
-                                            to: selectedTarget.id,
-                                            from: user.id,
-                                            name: user.name,
-                                            roomId: user.id // Using sender's ID as Room ID for simplicity
-                                        });
-                                    }
                                     setShowVideoConsultation(true);
                                 }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>🩺</div>
-                                <div style={{ fontWeight: 'bold', color: '#7e22ce' }}>Telehealth Video Room</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Secure Session</div>
+                                <div style={{ fontWeight: 'bold', color: '#7e22ce' }}>Start Video Call</div>
+                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Meet / WhatsApp</div>
                             </Card>
 
-                            {/* Video Call */}
+                            {/* Video Call (Removed redundant button, simplified to just one main action or kept for other legacy reasons? Let's keep simpler) */}
+                            {/* Replaced with a 'Send Invite' logic or just another entry point to same modal */}
                             <Card
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #f59e0b', background: '#fffbeb', transition: 'transform 0.2s' }}
                                 onClick={() => {
                                     if (!selectedTarget) return;
-                                    const socket = getSocket();
-                                    if (socket) {
-                                        socket.emit('call-invite', {
-                                            to: selectedTarget.id,
-                                            from: user.id,
-                                            name: user.name,
-                                            roomId: user.id
-                                        });
-                                    }
                                     setShowVideoConsultation(true);
                                 }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📹</div>
-                                <div style={{ fontWeight: 'bold', color: '#b45309' }}>Quick Video Call</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Instant Connection</div>
+                                <div style={{ fontWeight: 'bold', color: '#b45309' }}>Video Consult</div>
+                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Alternative</div>
                             </Card>
 
                             {/* Voice Note */}
@@ -368,20 +365,7 @@ export default function CommunicationHub({
                     </Card>
                 </div>
             )}
-            {showVideoConsultation && selectedTarget && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999 }}>
-                    <VideoConsultation
-                        roomId={user.id}
-                        user={user}
-                    />
-                    <button
-                        onClick={() => setShowVideoConsultation(false)}
-                        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000, padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                    >
-                        Close Video
-                    </button>
-                </div>
-            )}
+            {/* Removed Legacy Video Consultation Modal Block */}
         </Card>
     );
 }

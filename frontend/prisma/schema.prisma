@@ -26,6 +26,7 @@ model User {
   address                    String?
   phoneNumber                String?
   whatsappNumber             String?
+  whatsappVerified           Boolean         @default(false)
   avatarUrl                  String?
   bio                        String?
   specialization             String?

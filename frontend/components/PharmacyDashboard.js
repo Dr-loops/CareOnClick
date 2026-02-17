@@ -14,7 +14,8 @@ import WhatsAppButton from './WhatsAppButton';
 import CommunicationHub from './CommunicationHub';
 
 
-import VideoConsultation from './VideoConsultation'; // [NEW] (Dynamic import below actually, but keeps consistency)
+import VideoMethodModal from './VideoMethodModal';
+import { VideoCallService } from '@/lib/videoService';
 import ProfileModal from './ProfileModal'; // [NEW]
 import PharmacyAI from './pharmacy/PharmacyAI'; // [NEW] AI Support
 import PharmacyCompliance from './pharmacy/PharmacyCompliance'; // [NEW] Compliance & Logs
@@ -861,19 +862,23 @@ export default function PharmacyDashboard({ user }) {
                 {
                     activeTab === 'telepharmacy' && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem' }}>
-                            {showVideoCall ? (
-                                <div className="glass-card" style={{ height: '500px', overflow: 'hidden', padding: 0 }}>
-                                    <VideoConsultation user={user} patientId={selectedPatientId || 'PATH-GENERAL'} />
-                                    <button onClick={() => setShowVideoCall(false)} className="btn btn-secondary" style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 50 }}>Close Call</button>
-                                </div>
-                            ) : (
-                                <div className="glass-card" style={{ background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '450px' }}>
-                                    <div style={{ fontSize: '4rem' }}>🎧</div>
-                                    <h3>Telepharmacy Console</h3>
-                                    <p style={{ opacity: 0.7 }}>Secure video link for medication counseling or renewals.</p>
-                                    <button className="btn btn-primary" style={{ padding: '1rem 2rem', background: '#3b82f6', border: 'none' }} onClick={() => setShowVideoCall(true)}>Go Online (Start Video)</button>
-                                </div>
-                            )}
+                            <div className="glass-card" style={{ background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '450px', position: 'relative' }}>
+                                <div style={{ fontSize: '4rem' }}>🎧</div>
+                                <h3>Telepharmacy Console</h3>
+                                <p style={{ opacity: 0.7 }}>Secure video link for medication counseling or renewals.</p>
+                                <button className="btn btn-primary" style={{ padding: '1rem 2rem', background: '#3b82f6', border: 'none', marginTop: '1rem' }} onClick={() => setShowVideoCall(true)}>Go Online (Start Video)</button>
+                                {showVideoCall && (
+                                    <VideoMethodModal
+                                        isOpen={showVideoCall}
+                                        onClose={() => setShowVideoCall(false)}
+                                        onSelectMethod={(method) => {
+                                            setShowVideoCall(false);
+                                            const patient = realPatients.find(p => p.id === selectedPatientId) || { id: 'PATH-GENERAL', name: 'Walk-in Patient', phoneNumber: 'N/A' };
+                                            VideoCallService.startCall(method, patient, user.name);
+                                        }}
+                                    />
+                                )}
+                            </div>
 
                             <div className="glass-card">
                                 <h3>Secure Messaging (Direct)</h3>
@@ -1035,25 +1040,6 @@ export default function PharmacyDashboard({ user }) {
                 }
             </main >
 
-            {/* Profile Modal */}
-            {isProfileOpen && (
-                <ProfileModal
-                    user={userProfile}
-                    onClose={() => setIsProfileOpen(false)}
-                    onSave={handleProfileUpdate}
-                />
-            )}
-
-            {/* Billing Invoice Modal */}
-            {invoiceData && (
-                <BillingInvoiceModal
-                    isOpen={invoiceData.isOpen}
-                    onClose={() => setInvoiceData(null)}
-                    patient={invoiceData.patient}
-                    professionalName={user.name}
-                    professionalRole="Pharmacist"
-                />
-            )}
         </div >
     );
 }
