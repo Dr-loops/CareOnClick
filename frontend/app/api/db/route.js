@@ -48,6 +48,7 @@ export async function GET() {
             prisma.notification.findMany({ where: notificationFilter }),
             prisma.auditLog.findMany({
                 where: isPatient ? { actorId: user.id } : {},
+                orderBy: { timestamp: 'desc' },
                 take: 100
             }),
             prisma.patientProfile.findMany({ where: isPatient ? { userId: user.id } : {} }),
