@@ -138,7 +138,7 @@ export async function POST(request) {
                     actorName: resolvedSenderName,
                     target: `User:${recipientId}`,
                     details: `Message sent to ${recipientName || 'Recipient'} (${type})`,
-                    timestamp: new Date()
+                    timestamp: new Date(new Date().setFullYear(2026)) // Force 2026
                 }
             });
         } catch (logErr) { console.error("Audit Log Msg Error", logErr); }

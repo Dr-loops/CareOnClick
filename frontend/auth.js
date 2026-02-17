@@ -64,7 +64,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                                         actorName: user.name || user.email,
                                         target: 'System',
                                         details: `User logged in via Credentials`,
-                                        timestamp: new Date()
+                                        timestamp: new Date(new Date().setFullYear(2026)) // Force 2026
                                     }
                                 });
                                 console.log(`[AUTH] 📝 Audit Log created for login: ${user.email}`);

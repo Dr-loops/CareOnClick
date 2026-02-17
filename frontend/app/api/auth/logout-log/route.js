@@ -24,7 +24,7 @@ export async function POST(request) {
                 actorName: actorName,
                 target: 'System',
                 details: 'User initiated logout',
-                timestamp: new Date()
+                timestamp: new Date(new Date().setFullYear(2026)) // Force 2026
             }
         });
 

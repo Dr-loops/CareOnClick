@@ -100,7 +100,7 @@ export async function POST(request) {
                     actorName: session.user.name,
                     target: `Appointment:${newAppointment.id}`,
                     details: `Patient booked ${data.type} appointment with ${data.professionalName} for ${data.date} at ${data.time}`,
-                    timestamp: new Date()
+                    timestamp: new Date(new Date().setFullYear(2026)) // Force 2026
                 }
             });
         } catch (logErr) { console.error("Audit Log Appt Error", logErr); }

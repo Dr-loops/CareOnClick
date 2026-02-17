@@ -47,7 +47,7 @@ export async function GET(request) {
                             actorName: user.name || user.email,
                             target: `Patient:${patientId}`,
                             details: `Professional viewed medical records of patient ${patientId}`,
-                            timestamp: new Date()
+                            timestamp: new Date(new Date().setFullYear(2026)) // Force 2026
                         }
                     });
                 } catch (logErr) { console.error("Audit Log Record View Error", logErr); }
