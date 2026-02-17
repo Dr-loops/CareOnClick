@@ -54,6 +54,25 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                                 throw new Error('Account pending verification');
                             }
                             console.log(`[AUTH] ✅ SUCCESS: Password MATCH for: ${user.email}`);
+
+                            // AUDIT LOG: Successful Login
+                            try {
+                                await prisma.auditLog.create({
+                                    data: {
+                                        action: 'LOGIN',
+                                        actorId: user.id || user.email,
+                                        actorName: user.name || user.email,
+                                        target: 'System',
+                                        details: `User logged in via Credentials`,
+                                        timestamp: new Date()
+                                    }
+                                });
+                                console.log(`[AUTH] 📝 Audit Log created for login: ${user.email}`);
+                            } catch (logError) {
+                                console.error(`[AUTH] ⚠️ Failed to create audit log:`, logError);
+                                // Non-blocking failure
+                            }
+
                             return user;
                         } else {
                             console.log(`[AUTH] ❌ FAIL: Password MISMATCH for: ${user.email}`);

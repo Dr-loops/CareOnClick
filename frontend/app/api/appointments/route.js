@@ -91,6 +91,20 @@ export async function POST(request) {
             console.error("Failed to send notification", e);
         }
 
+        // AUDIT LOG: Appointment Booked
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    action: 'BOOK_APPOINTMENT',
+                    actorId: session.user.id,
+                    actorName: session.user.name,
+                    target: `Appointment:${newAppointment.id}`,
+                    details: `Patient booked ${data.type} appointment with ${data.professionalName} for ${data.date} at ${data.time}`,
+                    timestamp: new Date()
+                }
+            });
+        } catch (logErr) { console.error("Audit Log Appt Error", logErr); }
+
         return NextResponse.json(newAppointment);
 
     } catch (error) {

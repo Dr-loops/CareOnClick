@@ -36,6 +36,21 @@ export async function GET(request) {
                     where: { patientId: patientId },
                     orderBy: { createdAt: 'desc' }
                 });
+
+                // AUDIT LOG: Professional Viewed Patient Records
+                try {
+                    // Only log if records were found or intent was clear
+                    await prisma.auditLog.create({
+                        data: {
+                            action: 'VIEW_RECORDS',
+                            actorId: user.id || user.email,
+                            actorName: user.name || user.email,
+                            target: `Patient:${patientId}`,
+                            details: `Professional viewed medical records of patient ${patientId}`,
+                            timestamp: new Date()
+                        }
+                    });
+                } catch (logErr) { console.error("Audit Log Record View Error", logErr); }
             } else {
                 // If no filter, maybe return records *created by* this professional?
                 // Or return empty to avoid dumping huge list?

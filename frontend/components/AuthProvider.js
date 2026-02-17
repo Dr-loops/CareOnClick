@@ -91,6 +91,13 @@ function AuthStateAdapter({ children }) {
     };
 
     const logout = async () => {
+        try {
+            // Best-effort logout logging
+            await fetch('/api/auth/logout-log', { method: 'POST' });
+        } catch (e) {
+            console.error("Logout log failed", e);
+        }
+
         SecureStorage.removeItem('dr_kal_user');
         await signOut({ callbackUrl: '/login' });
     };

@@ -129,6 +129,20 @@ export async function POST(request) {
             await notificationService.sendAlert([recipient], content);
         }
 
+        // AUDIT LOG: Message Sent
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    action: 'SEND_MESSAGE',
+                    actorId: finalSenderId,
+                    actorName: resolvedSenderName,
+                    target: `User:${recipientId}`,
+                    details: `Message sent to ${recipientName || 'Recipient'} (${type})`,
+                    timestamp: new Date()
+                }
+            });
+        } catch (logErr) { console.error("Audit Log Msg Error", logErr); }
+
         return NextResponse.json({ success: true, message: newMessage });
     } catch (error) {
         console.error("Message Send Error", error);
