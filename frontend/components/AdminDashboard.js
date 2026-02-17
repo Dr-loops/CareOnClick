@@ -159,7 +159,7 @@ export default function AdminDashboard({ user }) {
     useEffect(() => {
         fetchUsers();
         fetchAppointments();
-        fetchAuditLogs();
+        // fetchAuditLogs(); // Removed: Now handled in fetchUsers via API
     }, []);
 
     const fetchUsers = async () => {
@@ -198,9 +198,15 @@ export default function AdminDashboard({ user }) {
                             }));
                             allRecords = [...allRecords, ...vitalRecords];
                         }
+
                         // Sort by date desc
                         allRecords.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
                         setRecords(allRecords);
+                    }
+
+                    // [FIX] Set Audit Logs from DB
+                    if (data.activity_logs && Array.isArray(data.activity_logs)) {
+                        setAuditLogs(data.activity_logs.reverse());
                     }
                 }
             }
