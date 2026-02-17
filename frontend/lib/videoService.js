@@ -63,5 +63,65 @@ export const VideoCallService = {
         // Basic cleaning
         const cleanNum = number.replace(/[^\d+]/g, '');
         return `https://wa.me/${cleanNum}`;
+    },
+
+    /**
+     * Unified call initiation
+     * @param {String} method - 'meet' or 'whatsapp'
+     * @param {Object} targetUser - The user being called
+     * @param {String} senderName - Name of the person initiating
+     */
+    startCall: async (method, targetUser, senderName) => {
+        const { getSocket } = require('@/lib/socket');
+        const socket = getSocket();
+
+        if (method === VIDEO_METHODS.MEET) {
+            // Open placeholder immediately to bypass popup blockers
+            const newWindow = window.open('about:blank', '_blank');
+            if (newWindow) newWindow.document.write('Initializing Google Meet...');
+
+            try {
+                const link = await VideoCallService.startMeetSession();
+                if (newWindow) {
+                    newWindow.location.href = link;
+                } else {
+                    window.open(link, '_blank');
+                }
+
+                // Notify Patient via Socket
+                if (socket && targetUser?.id) {
+                    socket.emit('send_notification', {
+                        recipientId: targetUser.id,
+                        type: 'VIDEO_CALL_STARTED',
+                        title: 'Video Consultation Started',
+                        message: `${senderName} has started a video consultation. Click to join.`,
+                        metadata: { link, action: 'JOIN_CALL' }
+                    });
+                }
+            } catch (e) {
+                console.error("Meet failed:", e);
+                if (newWindow) newWindow.close();
+                alert("Failed to start Google Meet. Please try again.");
+            }
+        } else if (method === VIDEO_METHODS.WHATSAPP) {
+            const number = targetUser?.whatsappNumber || targetUser?.phoneNumber;
+            if (!number) {
+                alert("This user does not have a registered phone number for WhatsApp.");
+                return;
+            }
+
+            const link = VideoCallService.getWhatsAppLink(number);
+            if (link) window.open(link, '_blank');
+
+            // Optional: Notify via socket too
+            if (socket && targetUser?.id) {
+                socket.emit('send_notification', {
+                    recipientId: targetUser.id,
+                    type: 'WHATSAPP_CALL_STARTED',
+                    title: 'WhatsApp Consultation',
+                    message: `${senderName} is initiating a WhatsApp consultation.`,
+                });
+            }
+        }
     }
 };

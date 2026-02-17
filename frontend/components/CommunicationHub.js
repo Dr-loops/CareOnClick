@@ -366,6 +366,16 @@ export default function CommunicationHub({
                 </div>
             )}
             {/* Removed Legacy Video Consultation Modal Block */}
+            {showVideoConsultation && (
+                <VideoMethodModal
+                    isOpen={showVideoConsultation}
+                    onClose={() => setShowVideoConsultation(false)}
+                    onSelectMethod={(method) => {
+                        setShowVideoConsultation(false);
+                        VideoCallService.startCall(method, selectedTarget, user.name);
+                    }}
+                />
+            )}
         </Card>
     );
 }

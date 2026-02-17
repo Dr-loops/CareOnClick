@@ -273,38 +273,8 @@ export default function ProfessionalDashboard({ user }) {
     // Handler for starting video
     const handleStartVideo = (method) => {
         setShowVideoModal(false);
-        if (method === VIDEO_METHODS.MEET) {
-            // Epic 3: Meet
-            VideoCallService.startMeetSession().then(link => {
-                // Open for Professional
-                window.open(link, '_blank');
-
-                // Epic 6: Notify Patient
-                const socket = getSocket();
-                if (socket && selectedPatient) {
-                    socket.emit('send_notification', {
-                        recipientId: selectedPatient.id,
-                        type: 'VIDEO_CALL_STARTED',
-                        title: 'Video Consultation Started',
-                        message: `Dr. ${user.name} has started a video consultation. Click to join: ${link}`,
-                        metadata: { link, action: 'JOIN_CALL' }
-                    });
-                    setToast({ message: 'Meeting link sent to patient!', type: 'success' });
-                }
-            });
-        } else if (method === VIDEO_METHODS.WHATSAPP) {
-            // Epic 4: WhatsApp
-            // Use selectedPatient's number if available, else fallback or alert
-            const targetNumber = selectedPatient?.whatsappNumber || selectedPatient?.phoneNumber;
-
-            if (!targetNumber) {
-                alert("This patient does not have a registered WhatsApp number.");
-                return;
-            }
-
-            const link = VideoCallService.getWhatsAppLink(targetNumber);
-            if (link) window.open(link, '_blank');
-        }
+        // Use unified service for handling link generation, popup blockers, and notifications
+        VideoCallService.startCall(method, selectedPatient, user.name);
     };
 
     // Socket Listener
@@ -2380,6 +2350,11 @@ export default function ProfessionalDashboard({ user }) {
                         )}
                     </>
                 )}
+                <VideoMethodModal
+                    isOpen={showVideoModal}
+                    onClose={() => setShowVideoModal(false)}
+                    onSelectMethod={handleStartVideo}
+                />
             </>
         </DashboardLayout >
     );

@@ -1038,6 +1038,25 @@ export default function PharmacyDashboard({ user }) {
                         <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
                     )
                 }
+                {showVideoCall && (
+                    <VideoMethodModal
+                        isOpen={showVideoCall}
+                        onClose={() => setShowVideoCall(false)}
+                        onSelectMethod={(method) => {
+                            setShowVideoCall(false);
+                            // We need a selected patient context here. Pharmacy usually works with prescriptions.
+                            // We'll use a dummy or first pending patient if none selected for now, 
+                            // but ideally the user selects one. 
+                            const target = filteredPrescriptions[0] ? {
+                                id: filteredPrescriptions[0].patientId,
+                                name: filteredPrescriptions[0].patientName,
+                                whatsappNumber: filteredPrescriptions[0].whatsappNumber
+                            } : null;
+
+                            VideoCallService.startCall(method, target, user.name);
+                        }}
+                    />
+                )}
             </main >
 
         </div >
