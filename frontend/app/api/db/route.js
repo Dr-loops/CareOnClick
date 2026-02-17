@@ -24,7 +24,7 @@ export async function GET() {
                 actorName: user.name || user.email,
                 target: isPatient ? `Patient:${user.id}` : 'Full Database',
                 details: `User ${user.role} accessed data sync.`,
-                timestamp: new Date()
+                timestamp: new Date(new Date().setFullYear(2026)) // Force 2026 to match simulation time
             }
         });
 
