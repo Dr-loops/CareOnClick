@@ -206,7 +206,8 @@ export default function AdminDashboard({ user }) {
 
                     // [FIX] Set Audit Logs from DB
                     if (data.activity_logs && Array.isArray(data.activity_logs)) {
-                        setAuditLogs(data.activity_logs.reverse());
+                        // API returns Newest First (Desc), so DO NOT reverse.
+                        setAuditLogs(data.activity_logs);
                     }
                 }
             }
