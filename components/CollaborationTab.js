@@ -13,6 +13,8 @@ export default function CollaborationTab({ user, selectedPatientId }) {
     const [attachment, setAttachment] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
 
+    const [careTeam, setCareTeam] = useState([]);
+
     // Refs
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -20,11 +22,7 @@ export default function CollaborationTab({ user, selectedPatientId }) {
 
     // Initial connection and room joining
     useEffect(() => {
-        // Initialize socket connection
-        // Note: In Next.js dev mode, this might create multiple connections if not careful.
-        // Moving socket init outside or using a singleton pattern is often preferred, 
-        // but for this component lifecycle it should be fine with cleanup.
-
+        // ... (Socket logic remains) ...
         if (!socket) {
             socket = io();
         }
@@ -43,16 +41,22 @@ export default function CollaborationTab({ user, selectedPatientId }) {
         }
 
         function onReceiveMessage(msg) {
-            setMessages(prev => [...prev, msg]);
+            setMessages(prev => {
+                // Deduplicate based on ID
+                if (prev.some(m => m.id === msg.id)) return prev;
+                return [...prev, msg];
+            });
             // Scroll to bottom when new message arrives
             setTimeout(() => scrollToBottom(), 100);
+
+            // Dynamic Team Update on receiving message
+            updateCareTeamFromMessage(msg);
         }
 
         socket.on('connect', onConnect);
         socket.on('disconnect', onDisconnect);
         socket.on('receive_message', onReceiveMessage);
 
-        // If socket is already connected (e.g. from previous mount or singleton), join room immediately
         if (socket.connected) {
             onConnect();
         }
@@ -61,29 +65,102 @@ export default function CollaborationTab({ user, selectedPatientId }) {
             socket.off('connect', onConnect);
             socket.off('disconnect', onDisconnect);
             socket.off('receive_message', onReceiveMessage);
-            // We generally don't disconnect the global socket here if it's shared, 
-            // but for this implementation we can leave it open or handle cleanup if needed.
         };
     }, [selectedPatientId]);
 
-    // Handle patient change (room switching)
-    useEffect(() => {
-        if (socket && socket.connected && selectedPatientId) {
-            // Re-emit join room when patient changes
-            socket.emit('join_room', selectedPatientId);
-            // Optionally clear messages or fetch history here
-            setMessages([]);
-        }
-    }, [selectedPatientId]);
+    // Helper to update Care Team from a message
+    const updateCareTeamFromMessage = (msg) => {
+        setCareTeam(prev => {
+            if (prev.some(m => m.name === msg.sender)) return prev; // Already exists
+            // Ignore system/patient messages if you only want pro team, but user asked for "professionals"
+            if (msg.role === 'patient') return prev;
 
-    // Scroll handling
+            return [...prev, {
+                name: msg.sender,
+                role: msg.role || 'Professional',
+                active: true, // Mark active as they just messaged
+                isSelf: msg.sender === user.name
+            }];
+        });
+    };
+
+    // Handle patient change (room switching) & Fetch History
+    useEffect(() => {
+        if (selectedPatientId) {
+            if (socket && socket.connected) {
+                socket.emit('join_room', selectedPatientId);
+            }
+
+            // Fetch History
+            const fetchHistory = async () => {
+                try {
+                    const res = await fetch(`/api/messages?patientId=${selectedPatientId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+
+                        // 1. Transform Messages
+                        const uiMessages = data.map(m => ({
+                            id: m.id,
+                            sender: m.senderName,
+                            role: m.role,
+                            text: m.content,
+                            attachment: null,
+                            patientId: m.recipientId,
+                            timestamp: m.timestamp || m.createdAt
+                        }));
+
+                        uiMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        setMessages(uiMessages);
+
+                        // 2. Build Dynamic Care Team
+                        const membersMap = new Map();
+
+                        // Always include SELF first
+                        membersMap.set(user.name, {
+                            name: user.name,
+                            role: user.role,
+                            active: true,
+                            isSelf: true
+                        });
+
+                        // Add members from history
+                        uiMessages.forEach(msg => {
+                            if (msg.role !== 'patient' && !membersMap.has(msg.sender)) {
+                                membersMap.set(msg.sender, {
+                                    name: msg.sender,
+                                    role: msg.role,
+                                    active: false, // Inferred from history
+                                    isSelf: msg.sender === user.name
+                                });
+                            }
+                        });
+
+                        setCareTeam(Array.from(membersMap.values()));
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch message history", e);
+                }
+            };
+
+            fetchHistory(); // Initial fetch
+
+            // Polling Fallback (every 3s)
+            const interval = setInterval(fetchHistory, 3000);
+            return () => clearInterval(interval);
+
+        } else {
+            setMessages([]);
+            setCareTeam([{ name: user.name, role: user.role, active: true, isSelf: true }]);
+        }
+    }, [selectedPatientId, user]);
+
+    // ... (Scroll handling remains) ...
     const scrollToBottom = (behavior = "smooth") => {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior, block: "end" });
         }
     };
 
-    // Auto-scroll on initial render or when messages change
     useEffect(() => {
         scrollToBottom("smooth");
     }, [messages]);
@@ -108,11 +185,13 @@ export default function CollaborationTab({ user, selectedPatientId }) {
         reader.readAsDataURL(file);
     };
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (!message.trim() && !attachment) return;
 
-        const newMessage = {
-            id: Date.now().toString(), // Simple ID generation
+        // 1. Construct Message Object (UI optimistic version)
+        const tempId = Date.now().toString();
+        const newMessageUI = {
+            id: tempId,
             sender: user.name,
             role: user.role,
             text: message,
@@ -121,26 +200,62 @@ export default function CollaborationTab({ user, selectedPatientId }) {
             timestamp: new Date().toISOString()
         };
 
-        // Emit to server
-        if (socket) {
-            socket.emit('send_message', newMessage);
-        }
+        // 0. Optimistic Update
+        setMessages(prev => [...prev, newMessageUI]);
+        setTimeout(() => scrollToBottom(), 100);
 
-        // Optimistically update UI? 
-        // We'll rely on the server broadcast ('receive_message') which includes 'self' in our server implementation.
-        // If server implementation excludes sender, we would add it here.
-        // Current server.js implementation: io.to(data.patientId).emit(...) -> broadcasts to everyone in room including sender.
+        try {
+            // 1. Persist to DB (FILE SYSTEM NOW)
+            // Pass Sender Info explicitly for the file storage
+            const res = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    senderId: user.id || 'MOCK_ID',
+                    senderName: user.name,
+                    role: user.role,
+                    recipientId: selectedPatientId,
+                    recipientName: 'Patient',
+                    content: message,
+                    type: 'CHAT'
+                })
+            });
+
+            if (!res.ok) {
+                console.error("Failed to save message");
+            }
+
+            // 2. Emit to Socket
+            if (socket) {
+                // Ensure socket message has needed fields for peers to update their Care Team list
+                socket.emit('send_message', {
+                    ...newMessageUI,
+                    senderName: user.name, // compatibility
+                    role: user.role
+                });
+            }
+        } catch (e) {
+            console.error("Error sending message", e);
+        }
 
         setMessage('');
         setAttachment(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleDelete = (id) => {
-        // Delete logic would need server support (emit 'delete_message').
-        // For now, we'll just filter locally for the user, but ideally this should be broadcasted too.
-        if (confirm('Delete this message locally? (Server sync pending)')) {
-            setMessages(prev => prev.filter(m => m.id !== id));
+    // ... (Delete/Keypress/RenderAttachment remain) ...
+    const handleDelete = async (id) => {
+        if (!confirm('Are you sure you want to delete this message?')) return;
+        try {
+            const res = await fetch(`/api/messages?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages(prev => prev.filter(m => m.id !== id));
+            } else {
+                alert('Failed to delete message');
+            }
+        } catch (e) {
+            console.error("Error deleting message", e);
+            alert('An error occurred.');
         }
     };
 
@@ -152,7 +267,6 @@ export default function CollaborationTab({ user, selectedPatientId }) {
 
     const renderAttachment = (att) => {
         if (!att) return null;
-
         if (att.type.startsWith('image/')) {
             return (
                 <div className="mt-2">
@@ -166,7 +280,6 @@ export default function CollaborationTab({ user, selectedPatientId }) {
                 </div>
             );
         }
-
         if (att.type.startsWith('video/')) {
             return (
                 <div className="mt-2">
@@ -176,7 +289,6 @@ export default function CollaborationTab({ user, selectedPatientId }) {
                 </div>
             );
         }
-
         return (
             <div className="chat-attachment-file" onClick={() => window.open(att.data)}>
                 <span className="file-icon">{att.type === 'application/pdf' ? '📄' : '📎'}</span>
@@ -188,13 +300,7 @@ export default function CollaborationTab({ user, selectedPatientId }) {
         );
     };
 
-    const careTeam = [
-        { name: 'Dr. Sarah', role: 'Cardiology', active: true },
-        { name: 'Nurse Joy', role: 'ICU', active: false },
-        { name: 'Mark', role: 'Pharmacist', active: false },
-        { name: 'Dr (Mls) White', role: 'Pathology', active: true },
-        { name: user.name, role: user.role, active: true, isSelf: true }
-    ];
+    // Care Team is now DYNAMIC 'careTeam' state, not hardcoded.
 
     return (
         <Card className="collaboration-card">
@@ -202,6 +308,7 @@ export default function CollaborationTab({ user, selectedPatientId }) {
             <div className="collab-sidebar">
                 <h4 className="collab-section-title">Care Team</h4>
                 <div className="care-team-list">
+                    {careTeam.length === 0 && <p className="text-xs text-slate-400 p-2">Wait for activity...</p>}
                     {careTeam.map((member, idx) => (
                         <div key={idx} className={`care-team-item ${member.isSelf ? 'self' : ''}`}>
                             <div className="care-team-avatar-wrapper">

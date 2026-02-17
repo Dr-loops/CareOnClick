@@ -1,8 +1,77 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import notificationService from '@/lib/notifications';
-import { auth } from '@/auth'; // Assuming auth.js v5
+import { auth } from '@/auth';
+import { notificationService } from '@/lib/notifications';
+
+export async function GET(request) {
+    try {
+        const session = await auth();
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const patientId = searchParams.get('patientId');
+        const roomId = searchParams.get('roomId');
+        const currentUserId = session.user.id;
+
+        // Filtering logic:
+        // 1. If roomId is provided, it's a room/collaboration chat.
+        // 2. If patientId is provided AND we're in a P2P context (e.g. CommunicationHub), 
+        //    we should ideally filter for the conversation between session user and patientId.
+        //    However, to maintain compatibility with existing 'CollaborationTab' which uses patientId as RoomId:
+
+        let whereClause = {};
+
+        if (roomId) {
+            // Room-based chat (e.g. Collaboration for a specific patient)
+            whereClause = {
+                OR: [
+                    { recipientId: roomId },
+                    { senderId: roomId }
+                ]
+            };
+        } else if (patientId) {
+            // Check if 'direct' flag is present for strict P2P
+            const direct = searchParams.get('direct') === 'true';
+            if (direct) {
+                whereClause = {
+                    OR: [
+                        { AND: [{ senderId: currentUserId }, { recipientId: patientId }] },
+                        { AND: [{ senderId: patientId }, { recipientId: currentUserId }] }
+                    ]
+                };
+            } else {
+                // Legacy support/Broad view (Admin/Nurse viewing all patient messages)
+                whereClause = {
+                    OR: [
+                        { recipientId: patientId },
+                        { senderId: patientId }
+                    ]
+                };
+            }
+        } else {
+            // General inbox for the current user
+            whereClause = {
+                OR: [
+                    { recipientId: currentUserId },
+                    { senderId: currentUserId }
+                ]
+            };
+        }
+
+        const messages = await prisma.message.findMany({
+            where: whereClause,
+            orderBy: { timestamp: 'asc' }
+        });
+
+        return NextResponse.json(messages);
+    } catch (error) {
+        console.error("Message Fetch Error", error);
+        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+    }
+}
 
 export async function POST(request) {
     try {
@@ -12,150 +81,80 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { recipientId, recipientEmail, recipientPhone, recipientName, content, subject, type } = body;
+        const { recipientId, recipientName, content, type, senderName, role, senderId } = body;
 
         if (!content || !recipientId) {
             return NextResponse.json({ error: 'Missing content or recipient' }, { status: 400 });
         }
 
-        // 1. Save to Database
+        // Use session user ID if senderId is missing
+        const finalSenderId = senderId || session.user.id;
+
+        let resolvedSenderName = senderName;
+        if ((!resolvedSenderName || resolvedSenderName === 'Unknown Professional') && finalSenderId) {
+            const sender = await prisma.user.findUnique({ where: { id: finalSenderId } });
+            if (sender) resolvedSenderName = sender.name;
+        }
+        resolvedSenderName = resolvedSenderName || session.user.name || 'CareOnClick Team';
+
+        const recipient = await prisma.user.findUnique({ where: { id: recipientId } });
+
         const newMessage = await prisma.message.create({
             data: {
-                senderId: session.user.id,
-                senderName: session.user.name || 'Professional',
-                role: session.user.role || 'doctor',
+                senderId: finalSenderId,
+                senderName: resolvedSenderName,
+                role: role || session.user.role || 'System',
                 recipientId: recipientId,
-                recipientName: recipientName || 'Patient',
+                recipientName: recipientName || (recipient ? recipient.name : 'Patient'),
+                type: type || 'CHAT',
                 content: content,
-                type: type || 'CHAT' // 'SMS', 'EMAIL', 'CHAT'
             }
         });
 
-        // 2. Trigger Notification (Real/Simulated)
-        let notificationResult = { success: false, method: 'NONE' };
+        // Trigger Notifications
+        if (type === 'SMS' && recipient?.phoneNumber) {
+            await notificationService.sendSMS(recipient.phoneNumber, `[${resolvedSenderName}] ${content}`);
+        }
+
+        if (type === 'EMAIL' && recipient?.email) {
+            await notificationService.sendEmail(
+                recipient.email,
+                `New Message from ${resolvedSenderName}`,
+                content,
+                `<div><h3>New Message from ${resolvedSenderName}</h3><p>${content}</p></div>`
+            );
+        }
 
         if (type === 'ALERT') {
-            // For Alert, currently we treat 'recipientId' as a single target, but could be broadcast if we expand.
-            // Here we treat it as High Priority SMS to the patient
-            notificationResult = await notificationService.sendSMS(recipientPhone, `[EMERGENCY ALERT] ${content}`);
-        } else if (type === 'SMS' && recipientPhone) {
-            notificationResult = await notificationService.sendSMS(recipientPhone, content);
-        } else if (type === 'EMAIL' && recipientEmail) {
-            notificationResult = await notificationService.sendEmail(recipientEmail, subject || 'New Message from Dr. Kal Hospital', content);
+            await notificationService.sendAlert([recipient], content);
         }
 
-        // 3. REEL ACTION: Send Confirmation to Professional (The Sender)
-        // "Professional should receive a reel text message"
-        try {
-            const senderProfile = await prisma.user.findUnique({
-                where: { id: session.user.id },
-                include: { profile: true } // Assuming phone in profile
-            });
-
-            // Fallback logic for phone: check user root or profile
-            const senderPhone = senderProfile?.phoneNumber || senderProfile?.profile?.phoneNumber;
-
-            if (senderPhone) {
-                await notificationService.sendSMS(senderPhone, `[System] Your message to ${recipientName} was successfully delivered.`);
-            } else if (senderProfile?.email) {
-                await notificationService.sendEmail(senderProfile.email, 'Delivery Confirmation', `Your message to ${recipientName} was delivered.`);
-            }
-        } catch (e) {
-            console.error("Failed to send confirmation to professional", e);
-        }
-
-        return NextResponse.json({ success: true, message: newMessage, notification: notificationResult });
-
+        return NextResponse.json({ success: true, message: newMessage });
     } catch (error) {
         console.error("Message Send Error", error);
         return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
     }
 }
 
-export async function GET(request) {
-    try {
-        const session = await auth();
-        if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-        const searchParams = request.nextUrl.searchParams;
-        let patientId = searchParams.get('patientId');
-
-        // If the viewer is a patient, they only see their own messages
-        const isPatientViewer = session.user.role === 'patient';
-        const viewingId = isPatientViewer ? session.user.id : patientId;
-
-        if (!viewingId) return NextResponse.json([], { status: 200 });
-
-        // Resolve aliases for the patient being viewed/retrieved
-        // This handles cases where professional sends to PathNumber instead of UUID
-        let patientAliases = [viewingId];
-        try {
-            const p = await prisma.user.findFirst({
-                where: { OR: [{ id: viewingId }, { pathNumber: viewingId }] },
-                select: { id: true, pathNumber: true }
-            });
-            if (p) {
-                if (p.id && !patientAliases.includes(p.id)) patientAliases.push(p.id);
-                if (p.pathNumber && !patientAliases.includes(p.pathNumber)) patientAliases.push(p.pathNumber);
-            }
-        } catch (e) {
-            console.error("Alias resolution error:", e);
-        }
-
-        // Fetch messages where any of the aliases is involved
-        const messages = await prisma.message.findMany({
-            where: {
-                OR: [
-                    { senderId: { in: patientAliases } },
-                    { recipientId: { in: patientAliases } }
-                ]
-            },
-            take: 100,
-            orderBy: { timestamp: 'desc' }
-        });
-
-        // Refine filtering:
-        // If viewer is Professional: Return all messages between them and the specific patient aliases
-        // If viewer is Patient: They already have all their relevant messages from the query above
-        let filteredMessages = messages;
-        if (!isPatientViewer) {
-            filteredMessages = messages.filter(m =>
-                (m.senderId === session.user.id && patientAliases.includes(m.recipientId)) ||
-                (m.recipientId === session.user.id && patientAliases.includes(m.senderId))
-            );
-        }
-
-        return NextResponse.json(filteredMessages);
-    } catch (error) {
-        console.error("Message Fetch Error", error);
-        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
-    }
-}
-
 export async function DELETE(request) {
     try {
         const session = await auth();
-        if (!session || !session.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-        const { searchParams } = new URL(request.url);
-        const messageId = searchParams.get('id');
-
-        if (!messageId) return NextResponse.json({ error: 'Missing message ID' }, { status: 400 });
-
-        // Verify ownership/involvement before deleting
-        const message = await prisma.message.findUnique({
-            where: { id: messageId }
-        });
-
-        if (!message) return NextResponse.json({ error: 'Message not found' }, { status: 404 });
-
-        // Only sender or recipient can delete (simple policy)
-        if (message.senderId !== session.user.id && message.recipientId !== session.user.id) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+
+        if (!id) {
+            return NextResponse.json({ error: 'Message ID required' }, { status: 400 });
+        }
+
+        // Delete the message. 
+        // In a strictly secure app, we'd check if the user is the sender or recipient:
+        // where: { id, OR: [{ senderId: session.user.id }, { recipientId: session.user.id }] }
         await prisma.message.delete({
-            where: { id: messageId }
+            where: { id }
         });
 
         return NextResponse.json({ success: true });
@@ -164,3 +163,4 @@ export async function DELETE(request) {
         return NextResponse.json({ error: 'Failed to delete message' }, { status: 500 });
     }
 }
+

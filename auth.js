@@ -6,8 +6,8 @@ import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
 const loginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
+    emailOrId: z.string().min(1), // Accept either email or ID
+    password: z.string(),
 });
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
@@ -15,31 +15,62 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     providers: [
         Credentials({
             async authorize(credentials) {
-                const parsedCredentials = loginSchema.safeParse(credentials);
+                console.error("!!! AUTH TRIGGERED !!!");
+                console.error("Credentials received:", JSON.stringify(credentials));
+                try {
+                    const parsedCredentials = loginSchema.safeParse(credentials);
 
-                if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data;
-                    console.log("Server Login Attempt:", email);
+                    if (parsedCredentials.success) {
+                        const { emailOrId, password } = parsedCredentials.data;
+                        const trimmedInput = emailOrId.trim();
+                        const lowerInput = trimmedInput.toLowerCase();
 
-                    const user = await prisma.user.findUnique({ where: { email } });
-                    if (!user) {
-                        console.log("User not found in DB:", email);
-                        return null;
-                    }
+                        console.log(`[AUTH] Attempting login for: "${emailOrId}"`);
 
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
-                    if (passwordsMatch) {
-                        console.log("Password match! Login success for:", email);
-                        return user;
+                        // Try finding user by Email (case insensitive) OR ID/Path (original)
+                        const user = await prisma.user.findFirst({
+                            where: {
+                                OR: [
+                                    { email: lowerInput },
+                                    { email: trimmedInput },
+                                    { id: trimmedInput },
+                                    { pathNumber: trimmedInput }
+                                ]
+                            }
+                        });
+
+                        if (!user) {
+                            console.log(`[AUTH] ❌ FAIL: User NOT FOUND for: "${emailOrId}" in DB: ${process.env.DATABASE_URL.substring(0, 30)}...`);
+                            return null;
+                        }
+
+                        console.log(`[AUTH] 🔍 OK: User FOUND - ${user.email} (ID: ${user.id})`);
+
+                        const passwordsMatch = await bcrypt.compare(password, user.password);
+                        if (passwordsMatch) {
+                            const isAllowed = user.verificationStatus === 'Verified' || user.verificationStatus === 'Approved';
+                            if (!isAllowed) {
+                                console.log(`[AUTH] ⚠️ BLOCK: User ${user.email} is ${user.verificationStatus} (not Verified/Approved)`);
+                                throw new Error('Account pending verification');
+                            }
+                            console.log(`[AUTH] ✅ SUCCESS: Password MATCH for: ${user.email}`);
+                            return user;
+                        } else {
+                            console.log(`[AUTH] ❌ FAIL: Password MISMATCH for: ${user.email}`);
+                            console.log(`[AUTH] Debug: Input password length: ${password.length}, DB password hash starts with: ${user.password.substring(0, 10)}`);
+                        }
                     } else {
-                        console.log("Password mismatch for:", email);
+                        console.log("[AUTH] ❌ FAIL: Invalid input format:", parsedCredentials.error.format());
                     }
-                } else {
-                    console.log("Invalid credentials schema");
+                } catch (e) {
+                    console.error("[AUTH] ‼️ FATAL ERROR in authorize:", e);
                 }
                 return null;
             },
         }),
     ],
     session: { strategy: 'jwt' },
+    secret: process.env.AUTH_SECRET || "DrKalsSuperSecretKey2026_FALLBACK",
+    trustHost: true,
+    debug: true,
 });

@@ -9,6 +9,8 @@ import { usePatients } from '@/lib/hooks/useClinicalData';
 import PatientAutofillInputs from './ui/PatientAutofillInputs';
 import WhatsAppButton from './WhatsAppButton';
 import CommunicationHub from './CommunicationHub';
+import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW]
+import ProfileModal from './ProfileModal'; // [NEW]
 
 
 const AlertsView = ({ professionalName, role, professionalId }) => {
@@ -75,6 +77,10 @@ export default function PsychologistDashboard({ user }) {
     const [activeTab, setActiveTab] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // [NEW] Profile Modal State
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [userProfile, setUserProfile] = useState(user); // Local user state
+
     const { patients } = usePatients(searchQuery);
 
     const normalizedPatients = patients.map(p => ({
@@ -94,7 +100,8 @@ export default function PsychologistDashboard({ user }) {
     const [dictatedNote, setDictatedNote] = useState('');
     const [toast, setToast] = useState(null);
     const [messages, setMessages] = useState([]);
-    const [loadingMessages, setLoadingMessages] = useState(false);
+    const [invoiceData, setInvoiceData] = useState(null); // [NEW] { patient: {}, isOpen: true/false }
+
 
 
 
@@ -115,14 +122,59 @@ export default function PsychologistDashboard({ user }) {
         alert('Confidential therapy note saved.');
     };
 
+    // [NEW] Handle Profile Update
+    const handleProfileUpdate = (updatedUser) => {
+        setUserProfile(updatedUser);
+        setIsProfileOpen(false);
+        alert('Profile updated successfully!');
+    };
+
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', minHeight: '80vh', gap: '1px', background: '#eee', borderRadius: '12px', overflow: 'hidden' }}>
+            {isProfileOpen && (
+                <ProfileModal
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
+                    onSave={handleProfileUpdate}
+                />
+            )}
+
+            {/* Billing Invoice Modal */}
+            {invoiceData && (
+                <BillingInvoiceModal
+                    isOpen={invoiceData.isOpen}
+                    onClose={() => setInvoiceData(null)}
+                    patient={invoiceData.patient}
+                    professionalName={user.name}
+                    professionalRole="Psychologist"
+                />
+            )}
             {/* Sidebar */}
             <aside style={{ background: 'white', padding: '1.5rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ fontSize: '3rem' }}>🧠</div>
-                    <h4>{user.name}</h4>
-                    <p style={{ color: '#666' }}>Psychologist</p>
+                    <div
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{
+                            fontSize: '3rem', cursor: 'pointer', margin: '0 0 1rem 0', display: 'inline-block',
+                            width: '80px', height: '80px', borderRadius: '50%', background: '#f8fafc',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #e2e8f0', overflow: 'hidden'
+                        }}
+                        title="Click to Edit Profile"
+                    >
+                        {userProfile.avatarUrl ? (
+                            <img src={userProfile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                    </div>
+                    <h4>{userProfile.name}</h4>
+                    <button
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.75rem', marginTop: '0.2rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Edit Profile
+                    </button>
+                    <p style={{ color: '#666', marginTop: '0.5rem' }}>Psychologist</p>
                 </div>
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <button onClick={() => setActiveTab('overview')} className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', textAlign: 'left' }}>Overview</button>
@@ -139,7 +191,7 @@ export default function PsychologistDashboard({ user }) {
             <main style={{ background: 'white', padding: '2rem', overflowY: 'auto' }}>
                 {activeTab === 'overview' && (
                     <div>
-                        <h2>Psychology Department Overview</h2>
+                        <h2>CareOnClick Psychology Department Overview</h2>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
                             <div className="card" style={{ padding: '2rem', textAlign: 'center', background: '#f0f9ff' }}>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#0ea5e9' }}>{normalizedPatients.length}</div>
@@ -156,7 +208,7 @@ export default function PsychologistDashboard({ user }) {
                 {activeTab === 'patients' && (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                            <h2>Patient Management</h2>
+                            <h2>CareOnClick Patient Management</h2>
                             <input
                                 type="text"
                                 placeholder="Search patients..."

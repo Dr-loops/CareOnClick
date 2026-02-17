@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Camera, X } from 'lucide-react';
+import { POPULAR_REGIONS } from '@/lib/location_data';
 
 // Let's assume we need to build a self-contained modal helper or reusing one.
 // ProfessionalDashboard uses Card, Button, Input. Let's use those.
@@ -19,10 +20,18 @@ export default function ProfileModal({ user, onClose, onSave }) {
         specialization: user.specialization || '',
         avatarUrl: user.avatarUrl || '' // Base64 string
     });
+    const [passwords, setPasswords] = useState({
+        newPassword: '',
+        confirmPassword: ''
+    });
     const [isSaving, setIsSaving] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handlePasswordChange = (e) => {
+        setPasswords({ ...passwords, [e.target.name]: e.target.value });
     };
 
     const handleImageUpload = (e) => {
@@ -70,12 +79,24 @@ export default function ProfileModal({ user, onClose, onSave }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Password matching validation
+        if (passwords.newPassword && passwords.newPassword !== passwords.confirmPassword) {
+            alert("New passwords do not match!");
+            return;
+        }
+
         setIsSaving(true);
         try {
+            const payload = {
+                ...formData,
+                password: passwords.newPassword || undefined
+            };
+
             const res = await fetch('/api/user/profile', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             if (res.ok) {
@@ -197,7 +218,48 @@ export default function ProfileModal({ user, onClose, onSave }) {
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>Region</label>
-                            <input className="input-field" name="region" value={formData.region} onChange={handleChange} style={{ width: '100%' }} />
+                            <select
+                                className="input-field"
+                                name="region"
+                                value={formData.region}
+                                onChange={handleChange}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="">Select Region</option>
+                                {POPULAR_REGIONS['Ghana'].map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '0.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '1rem', color: '#1e293b' }}>🔐 Change Password</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>New Password</label>
+                                <input
+                                    className="input-field"
+                                    type="password"
+                                    name="newPassword"
+                                    value={passwords.newPassword}
+                                    onChange={handlePasswordChange}
+                                    placeholder="Leave blank to keep current"
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>Confirm New Password</label>
+                                <input
+                                    className="input-field"
+                                    type="password"
+                                    name="confirmPassword"
+                                    value={passwords.confirmPassword}
+                                    onChange={handlePasswordChange}
+                                    placeholder="Repeat new password"
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
                         </div>
                     </div>
 

@@ -1,91 +1,78 @@
 import Link from 'next/link';
-import AdBanner from '@/components/AdBanner'; // Import AdBanner
-import NewsFeed from '@/components/NewsFeed'; // Import NewsFeed
+import AdBanner from '@/components/AdBanner';
+import NewsFeed from '@/components/NewsFeed';
 
 export default function Home() {
     return (
-        <div className="container">
-
-            {/* Hero Section - Reverted to split layout */}
-            <section className="hero-section" style={{ padding: '4rem 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-                <div>
-                    <h1 style={{ fontSize: '5.5rem', marginBottom: '1.5rem', lineHeight: 1.1, fontWeight: '800', color: 'var(--color-navy)' }}>
-                        Dr. Kal&apos;s <br />
-                        <span style={{ color: 'var(--color-sea-blue)' }}>Virtual Hospital</span>
+        <div className="container main-page">
+            {/* Hero Section */}
+            <section className="hero-section">
+                <div className="hero-content">
+                    <h1 className="hero-title">
+                        CareOnClick
                     </h1>
-                    <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', marginBottom: '2.5rem', maxWidth: '500px' }}>
-                        Connect with top-tier medical professionals from the comfort of your home. Secure, efficient, and patient-centered.
+                    <p className="hero-subtitle">
+                        Connect with top-tier medical professionals from the comfort of your home. Secure, efficient, and patient-centered care for everyone.
                     </p>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <Link href="/register?type=patient" className="btn btn-primary" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
-                            Get Started as Patient
+                    <div className="hero-btns">
+                        <Link href="/register?type=patient" className="btn btn-primary btn-lg">
+                            Get Started
                         </Link>
-                        <Link href="/login" className="btn btn-secondary" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
-                            Login
+                        <Link href="/login" className="btn btn-secondary btn-lg">
+                            Sign In
                         </Link>
                     </div>
-                    <div style={{ marginTop: '2rem', fontSize: '0.9rem' }}>
-                        <Link href="/register?type=professional" style={{ color: 'var(--color-navy)', fontWeight: 'bold' }}>
-                            Are you a Medical Professional? Join us →
-                        </Link>
-                        <br />
-                        <Link href="/register?type=admin" style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.5rem', display: 'inline-block' }}>
-                            Admin Portal
+                    <div className="hero-meta">
+                        <Link href="/register?type=professional" className="prof-registration-card">
+                            Register as Health Professional
                         </Link>
                     </div>
                 </div>
-                <div style={{ position: 'relative' }}>
-                    {/* Placeholder for standard "Hero Image" - using emoji or div for now if no image asset */}
-                    <div style={{
-                        background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)',
-                        borderRadius: '20px',
-                        padding: '3rem',
-                        textAlign: 'center',
-                        border: '2px dashed var(--color-sea-blue)'
-                    }}>
-                        <div style={{ fontSize: '8rem' }}>🏥</div>
-                        <p style={{ color: 'var(--color-navy)', fontWeight: 'bold' }}>Dr. Kal&apos;s Virtual Hospital</p>
+                <div className="hero-image-wrapper">
+                    <div className="hero-visual-card float-effect">
+                        <div className="visual-icon">🏥</div>
+                        <p className="visual-label">Official Virtual Healthcare Partner</p>
+                        <div className="visual-badge">24/7 Available</div>
                     </div>
                 </div>
             </section>
 
-            {/* Features (Classic 3-col) */}
-            <section className="features-grid" style={{ marginBottom: '5rem' }}>
-                <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                    <h2 style={{ fontSize: '2rem', color: 'var(--color-navy)' }}>Why Choose Us?</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>Everything you need for better health management.</p>
+            {/* Features Section */}
+            <section className="features-section">
+                <div className="section-header">
+                    <h2 className="section-title">Why Choose Us?</h2>
+                    <p className="section-subtitle">High-quality medical services delivered with precision and empathy.</p>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem' }}>
-                    <div className="card" style={{ padding: '2rem', borderTop: '4px solid var(--color-sea-blue)' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🩺</div>
+                <div className="features-grid">
+                    <div className="card feature-card">
+                        <div className="feature-icon">🩺</div>
                         <h3>Expert Care</h3>
-                        <p>Access certified doctors, nurses, and specialists anytime.</p>
+                        <p>Access certified doctors, nurses, and specialists anytime, anywhere.</p>
                     </div>
-                    <div className="card" style={{ padding: '2rem', borderTop: '4px solid var(--color-sea-blue)' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📅</div>
+                    <div className="card feature-card">
+                        <div className="feature-icon">📅</div>
                         <h3>Easy Scheduling</h3>
-                        <p>Book video or in-person appointments in just a few clicks.</p>
+                        <p>Book video or in-person appointments in just a few simple clicks.</p>
                     </div>
-                    <div className="card" style={{ padding: '2rem', borderTop: '4px solid var(--color-sea-blue)' }}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🛡️</div>
+                    <div className="card feature-card">
+                        <div className="feature-icon">🛡️</div>
                         <h3>Secure Records</h3>
                         <p>Your medical history is safe, encrypted, and accessible only to you.</p>
                     </div>
                 </div>
             </section>
 
-
-
-            {/* Bottom Section: Ad & News Feed */}
-            <div className="ad-news-layout" style={{ marginTop: '4rem', marginBottom: '4rem' }}>
-                <div style={{ width: '100%' }}>
+            {/* Ad & News Section */}
+            <section className="ad-news-section">
+                <div className="ad-wrapper animate-fade-in">
                     <AdBanner />
                 </div>
-                <div style={{ width: '100%', height: '100%', minHeight: '400px' }}>
+                <div className="news-wrapper animate-fade-in">
                     <NewsFeed />
                 </div>
-            </div>
+            </section>
         </div>
     );
 }
+

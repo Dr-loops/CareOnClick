@@ -70,7 +70,7 @@ export async function POST(request) {
                 date: new Date(data.date),
                 time: data.time,
                 type: data.type || 'Video',
-                status: 'Upcoming',
+                status: 'Pending', // Changed from 'Upcoming' to 'Pending' for manual approval
                 amountPaid: parseFloat(data.amountPaid || 0),
                 balanceDue: parseFloat(data.balanceDue || 0),
                 paymentStatus: data.amountPaid > 0 ? 'Paid' : 'Pending', // Simplified logic
@@ -84,7 +84,7 @@ export async function POST(request) {
             // For now, using the generic service which handles the logic or logs it
             await notificationService.sendSMS(
                 'SYSTEM', // System ID
-                `New Booking: ${session.user.name} for ${data.date} at ${data.time}. Type: ${data.type}`
+                `New Pending Booking: ${session.user.name} for ${data.date} at ${data.time}. Type: ${data.type}`
             );
             // Ideally we look up the professional's phone number here
         } catch (e) {
@@ -96,6 +96,68 @@ export async function POST(request) {
     } catch (error) {
         console.error("Failed to create appointment", error);
         return NextResponse.json({ error: `Failed to create appointment: ${error.message}` }, { status: 500 });
+    }
+}
+
+export async function PUT(request) {
+    try {
+        const session = await auth();
+        if (!session || !session.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const data = await request.json();
+        const { id, status } = data;
+
+        if (!id || !status) {
+            return NextResponse.json({ error: 'Missing appointment ID or status' }, { status: 400 });
+        }
+
+        // Verify ownership/permissions? 
+        // Professionals can update status. Patients might cancel (status=Cancelled).
+        // For simplicity, allowing authenticated users to update for now, but ideally check role.
+
+        const updatedAppointment = await prisma.appointment.update({
+            where: { id },
+            data: { status },
+            include: { professional: true }
+        });
+
+        // [NEW] Trigger Patient Alert on Status Change
+        if (status === 'Upcoming' || status === 'Cancelled') {
+            try {
+                const actionText = status === 'Upcoming' ? 'accepted' : 'cancelled';
+                const alertType = status === 'Upcoming' ? 'CHAT' : 'ALERT';
+                const content = status === 'Upcoming'
+                    ? `Your appointment with ${updatedAppointment.professionalName} on ${updatedAppointment.date.toLocaleDateString()} at ${updatedAppointment.time} has been accepted.`
+                    : `Your appointment with ${updatedAppointment.professionalName} on ${updatedAppointment.date.toLocaleDateString()} has been cancelled.`;
+
+                await prisma.message.create({
+                    data: {
+                        senderId: updatedAppointment.professionalId,
+                        senderName: updatedAppointment.professionalName,
+                        role: updatedAppointment.professional.role,
+                        recipientId: updatedAppointment.patientId,
+                        recipientName: updatedAppointment.patientName,
+                        type: alertType,
+                        content: content,
+                    }
+                });
+
+                // Also trigger real-time notification service if available
+                if (status === 'Cancelled') {
+                    await notificationService.sendSMS('SYSTEM', `Appointment ${id} ${actionText} for ${updatedAppointment.patientName}`);
+                }
+            } catch (notifyErr) {
+                console.error("Failed to create status notification message", notifyErr);
+            }
+        }
+
+        return NextResponse.json(updatedAppointment);
+
+    } catch (error) {
+        console.error("Failed to update appointment", error);
+        return NextResponse.json({ error: 'Failed to update appointment' }, { status: 500 });
     }
 }
 

@@ -4,6 +4,7 @@ import { PHARMACY_TABS, MOCK_PHARMACY_DATA } from '@/lib/pharmacy_data';
 import { MOCK_PATIENTS, AI_SUGGESTIONS, CLINICAL_ALERTS } from '@/lib/physician_data';
 import { getGlobalData, KEYS, dispatchSync, updateNotificationStatus, updateAppointment, updatePrescription, savePrescription, saveGlobalRecord } from '@/lib/global_sync';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
+import { useStaff } from '@/lib/hooks/useStaff';
 import { usePatients } from '@/lib/hooks/useClinicalData';
 import PatientRecordFinder from './PatientRecordFinder';
 import CollaborationTab from './CollaborationTab';
@@ -13,7 +14,12 @@ import WhatsAppButton from './WhatsAppButton';
 import CommunicationHub from './CommunicationHub';
 
 
-const VideoConsultation = dynamic(() => import('./VideoConsultation'), { ssr: false });
+import VideoConsultation from './VideoConsultation'; // [NEW] (Dynamic import below actually, but keeps consistency)
+import ProfileModal from './ProfileModal'; // [NEW]
+import PharmacyAI from './pharmacy/PharmacyAI'; // [NEW] AI Support
+import PharmacyCompliance from './pharmacy/PharmacyCompliance'; // [NEW] Compliance & Logs
+import PharmacyIntegrations from './pharmacy/PharmacyIntegrations'; // [NEW] Integrations Tab
+import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW] Invoice Modal
 
 
 const AlertsView = ({ professionalName, role, professionalId }) => {
@@ -127,22 +133,35 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
 };
 
 export default function PharmacyDashboard({ user }) {
-    if (!user) return <div className="p-8 text-center">Loading Pharmacist Dashboard...</div>;
-
     useGlobalSync();
-    const [activeTab, setActiveTab] = useState('inbox');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState('overview');
+    const { staff } = useStaff();
     const [selectedPatientId, setSelectedPatientId] = useState(null);
+    const [selectedPatient, setSelectedPatient] = useState(null); // Full object for details
+    const [invoiceData, setInvoiceData] = useState(null); // [NEW] { patient: {}, isOpen: true/false }
+    // [NEW] Profile Modal State
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [userProfile, setUserProfile] = useState(user); // Local user state
+
+    useEffect(() => {
+        if (staff && staff.length > 0) {
+            const me = staff.find(s => s.id === user.id);
+            if (me) {
+                setUserProfile(prev => ({ ...prev, ...me }));
+            }
+        }
+    }, [staff, user.id]);
     const [isRecording, setIsRecording] = useState(false);
     const [dictatedNote, setDictatedNote] = useState('');
     const [toast, setToast] = useState(null);
     const [messages, setMessages] = useState([]);
-    const [loadingMessages, setLoadingMessages] = useState(false);
+
     const [showVideoCall, setShowVideoCall] = useState(false);
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [updateItem, setUpdateItem] = useState(null);
     const [showNewEntryModal, setShowNewEntryModal] = useState(false);
     const [newEntryData, setNewEntryData] = useState({ patientName: '', patientId: '', drug: '', dosage: '', status: 'Pending' });
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Fetch real patients (defensive check)
     const { patients: realPatients = [] } = usePatients(searchQuery) || {};
@@ -152,10 +171,9 @@ export default function PharmacyDashboard({ user }) {
 
     // Defensive: Ensure we're working with arrays and filter out nulls
     const validGlobalRx = (Array.isArray(globalPrescriptions) ? globalPrescriptions : []).filter(item => item && typeof item === 'object');
-    const validMockRx = (Array.isArray(MOCK_PHARMACY_DATA?.prescriptions) ? MOCK_PHARMACY_DATA.prescriptions : []).filter(item => item && typeof item === 'object');
 
     // Filter to only show prescriptions for REAL patients
-    const prescriptions = (validGlobalRx.length > 0 ? validGlobalRx : validMockRx).filter(rx =>
+    const prescriptions = (validGlobalRx).filter(rx =>
         rx && rx.patientId && Array.isArray(realPatients) && realPatients.find(p => p && (p.id === rx.patientId || p.pathNumber === rx.patientId))
     );
 
@@ -178,9 +196,9 @@ export default function PharmacyDashboard({ user }) {
             } catch (e) {
                 console.error('Failed to load inventory', e);
             }
-            // Fallback
-            console.log('Loading MOCK Inventory');
-            setInventory(Array.isArray(MOCK_PHARMACY_DATA?.inventory) ? MOCK_PHARMACY_DATA.inventory : []);
+            // Fallback (Empty)
+            console.log('No inventory found, initializing empty.');
+            setInventory([]);
         }
     }, []);
 
@@ -249,6 +267,13 @@ export default function PharmacyDashboard({ user }) {
         // setNewEntryData({ patientName: '', patientId: '', drug: '', dosage: '', status: 'Pending' }); // REMOVED: Keep data
     };
 
+    // [NEW] Handle Profile Update
+    const handleProfileUpdate = (updatedUser) => {
+        setUserProfile(updatedUser);
+        setIsProfileOpen(false);
+        alert('Profile updated successfully!');
+    };
+
     const handleDispense = async (rx) => {
         if (!confirm(`Confirm dispensing: ${rx.drug} for ${rx.patientName}?`)) return;
 
@@ -313,6 +338,24 @@ export default function PharmacyDashboard({ user }) {
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', minHeight: '90vh', background: '#f8fafc', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.05)' }}>
+            {isProfileOpen && (
+                <ProfileModal
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
+                    onSave={handleProfileUpdate}
+                />
+            )}
+
+            {/* Billing Invoice Modal */}
+            {invoiceData && (
+                <BillingInvoiceModal
+                    isOpen={invoiceData.isOpen}
+                    onClose={() => setInvoiceData(null)}
+                    patient={invoiceData.patient}
+                    professionalName={user.name}
+                    professionalRole="Pharmacist"
+                />
+            )}
             <style jsx>{`
                 .sidebar-btn { width: 100%; border: none; padding: 0.8rem 1.2rem; text-align: left; background: transparent; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 10px; border-radius: 8px; font-weight: 500; color: #64748b; }
                 .sidebar-btn:hover { background: #f1f5f9; color: var(--color-navy); }
@@ -327,10 +370,28 @@ export default function PharmacyDashboard({ user }) {
             {/* Premium Sidebar */}
             <aside style={{ background: 'white', borderRight: '1px solid #e2e8f0', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{ width: '80px', height: '80px', background: 'linear-gradient(135deg, #0f172a, #334155)', color: 'white', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', margin: '0 auto 1rem', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}>
-                        💊
+                    <div
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{
+                            width: '80px', height: '80px', background: 'linear-gradient(135deg, #0f172a, #334155)', color: 'white',
+                            borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '2.5rem', margin: '0 auto 1rem', boxShadow: '0 10px 20px rgba(0,0,0,0.1)', cursor: 'pointer', overflow: 'hidden'
+                        }}
+                        title="Click to Edit Profile"
+                    >
+                        {userProfile.avatarUrl ? (
+                            <img src={userProfile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
                     </div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>{user.name}</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1e293b' }}>{userProfile.name}</h3>
+                    <button
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.75rem', marginTop: '0.2rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Edit Profile
+                    </button>
                     <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Modern Pharmacy Operations</p>
                 </div>
 
@@ -354,8 +415,8 @@ export default function PharmacyDashboard({ user }) {
             <main style={{ padding: '2.5rem', overflowY: 'auto' }}>
                 <header className="tab-header">
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '2rem', color: '#0f172a' }}>{PHARMACY_TABS.find(t => t.id === activeTab)?.name}</h1>
-                        <p style={{ margin: 0, color: '#64748b' }}>Manage your pharmacy workflow efficiently.</p>
+                        <h1 style={{ margin: 0, fontSize: '2rem', color: '#0f172a' }}>CareOnClick Pharmacy {PHARMACY_TABS.find(t => t.id === activeTab)?.name}</h1>
+                        <p style={{ margin: 0, color: '#64748b' }}>Manage your pharmacy workflow efficiently with CareOnClick.</p>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <div style={{ position: 'relative' }}>
@@ -438,6 +499,30 @@ export default function PharmacyDashboard({ user }) {
                     </div>
                 )}
 
+                {
+                    activeTab === 'support' && (
+                        <div style={{ height: '85vh' }}>
+                            <PharmacyAI inventory={inventory} patients={realPatients} />
+                        </div>
+                    )
+                }
+
+                {
+                    activeTab === 'compliance' && (
+                        <div style={{ height: '85vh' }}>
+                            <PharmacyCompliance />
+                        </div>
+                    )
+                }
+
+                {
+                    activeTab === 'integrations' && (
+                        <div style={{ height: '85vh' }}>
+                            <PharmacyIntegrations />
+                        </div>
+                    )
+                }
+
                 {/* Tab Contents */}
                 {activeTab === 'inbox' && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
@@ -469,6 +554,14 @@ export default function PharmacyDashboard({ user }) {
                                                         💊 Dispense
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setInvoiceData({ patient: { id: rx.patientId, name: rx.patientName, email: 'N/A' }, isOpen: true }); }}
+                                                    className="btn btn-secondary"
+                                                    style={{ marginTop: '0.5rem', marginLeft: '0.5rem', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                                                    title="Print Pharmacy Bill"
+                                                >
+                                                    🖨️ Bill
+                                                </button>
                                             </div>
                                         </div>
                                         {rx.issue && rx.issue !== '✅ Clear' && Array.isArray(rx.alerts) && rx.alerts.length > 0 && (
@@ -756,8 +849,14 @@ export default function PharmacyDashboard({ user }) {
                                 </div>
                             )}
                         </div>
+
                     )
                 }
+
+
+
+
+                {activeTab === 'collaboration' && <CollaborationTab user={user} selectedPatientId={selectedPatientId} />}
 
                 {
                     activeTab === 'telepharmacy' && (
@@ -839,6 +938,7 @@ export default function PharmacyDashboard({ user }) {
                         <CommunicationHub
                             user={user}
                             patients={realPatients}
+                            staff={staff}
                             initialPatientId={selectedPatientId}
                             onPatientSelect={(p) => setSelectedPatientId(p.id)}
                         />
@@ -934,6 +1034,26 @@ export default function PharmacyDashboard({ user }) {
                     )
                 }
             </main >
+
+            {/* Profile Modal */}
+            {isProfileOpen && (
+                <ProfileModal
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
+                    onSave={handleProfileUpdate}
+                />
+            )}
+
+            {/* Billing Invoice Modal */}
+            {invoiceData && (
+                <BillingInvoiceModal
+                    isOpen={invoiceData.isOpen}
+                    onClose={() => setInvoiceData(null)}
+                    patient={invoiceData.patient}
+                    professionalName={user.name}
+                    professionalRole="Pharmacist"
+                />
+            )}
         </div >
     );
 }

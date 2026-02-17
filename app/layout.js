@@ -1,8 +1,11 @@
 import { Montserrat, Open_Sans } from 'next/font/google';
 import './globals.css';
 import Navbar from '../components/Navbar';
+import DashboardNav from '../components/DashboardNav';
+import Footer from '../components/Footer';
 import { AuthProvider } from '@/components/AuthProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import NotificationManager from '@/components/NotificationManager';
 
 const montserrat = Montserrat({
     subsets: ['latin'],
@@ -17,8 +20,17 @@ const openSans = Open_Sans({
 });
 
 export const metadata = {
-    title: "Dr Kal's Virtual Hospital",
-    description: 'A secure online hospital platform.',
+    title: {
+        default: "CareOnClick",
+        template: "%s | CareOnClick"
+    },
+    description: 'A premium, secure healthcare platform providing virtual consultations, medical records, and real-time patient care.',
+    keywords: ['virtual hospital', 'telehealth', 'healthcare platform', 'online doctor', 'medical records'],
+    authors: [{ name: 'CareOnClick Team' }],
+    viewport: 'width=device-width, initial-scale=1',
+    icons: {
+        icon: '/logo_new.jpg',
+    },
 };
 
 export default function RootLayout({ children }) {
@@ -27,11 +39,14 @@ export default function RootLayout({ children }) {
             <body className={`${openSans.variable} ${montserrat.variable}`} suppressHydrationWarning={true}>
                 <AuthProvider>
                     <Navbar />
+                    <NotificationManager />
+                    <DashboardNav />
                     <main className="main-content">
                         <ErrorBoundary>
                             {children}
                         </ErrorBoundary>
                     </main>
+                    <Footer />
                 </AuthProvider>
             </body>
         </html>

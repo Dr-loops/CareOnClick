@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import Link from 'next/link';
+import { Input } from '@/components/ui/Input';
 
 export default function LoginPage() {
     const { login } = useAuth();
@@ -9,133 +10,167 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleSubmit = (e) => {
+    // Forgot Password State
+    const [isForgotMode, setIsForgotMode] = useState(false);
+    const [resetStep, setResetStep] = useState(1); // 1: Email, 2: OTP & New Pass
+    const [resetData, setResetData] = useState({ contact: '', otp: '', newPassword: '' }); // 'contact' replaces 'email'
+    const [resetMsg, setResetMsg] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const res = login(email, password);
+        setError('');
+        const res = await login(email, password);
         if (!res.success) {
             setError(res.error);
         }
     };
 
+    const handleForgotRequest = async (e) => {
+        e.preventDefault();
+        setIsResetting(true);
+        setResetMsg('');
+        try {
+            const res = await fetch('/api/auth/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'request_reset', contact: resetData.contact })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setResetStep(2);
+                if (data.debug_otp) alert(`[SIMULATION] Your OTP code is: ${data.debug_otp}`);
+                setResetMsg(data.message || 'OTP Code sent to your contact.');
+            } else {
+                setError(data.error || 'Failed to send OTP');
+            }
+        } catch (err) { setError('Connection error'); }
+        finally { setIsResetting(false); }
+    };
+
+    const handleForgotConfirm = async (e) => {
+        e.preventDefault();
+        setIsResetting(true);
+        setError('');
+        try {
+            const res = await fetch('/api/auth/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'confirm_reset',
+                    contact: resetData.contact,
+                    otp: resetData.otp,
+                    newPassword: resetData.newPassword
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Password Reset Successfully! Please login with your new password.");
+                setIsForgotMode(false);
+                setResetStep(1);
+                // If they used email for recovery, prefill it. If phone, maybe leave blank or fill if possible (but login expects email usually?)
+                // Login page expects 'email' state usually.
+                if (resetData.contact.includes('@')) setEmail(resetData.contact);
+                setPassword('');
+            } else {
+                setError(data.error || 'Reset failed');
+            }
+        } catch (err) { setError('Connection error'); }
+        finally { setIsResetting(false); }
+    };
+
     return (
-        <div className="container" style={{ marginTop: '4rem', display: 'flex', gap: '2rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <div className="card" style={{ maxWidth: '400px', flex: '1', minWidth: '300px' }}>
-                <h2 style={{ textAlign: 'center' }}>Welcome Back</h2>
-                {error && <p style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>}
+        <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div className="card" style={{ maxWidth: '450px', width: '100%', padding: '3rem', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', borderRadius: '24px' }}>
 
-                <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Email</label>
-                        <input
-                            type="email"
-                            className="input-field"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            suppressHydrationWarning
-                        />
-                    </div>
+                {/* HEADERS */}
+                <h2 style={{ textAlign: 'center', fontSize: '2rem', color: 'var(--color-navy)', marginBottom: '1rem', fontWeight: '800' }}>
+                    {isForgotMode ? 'Reset Password' : 'Welcome Back'}
+                </h2>
 
-                    <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
-                        <input
-                            type="password"
-                            className="input-field"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            suppressHydrationWarning
-                        />
-                    </div>
+                {/* ERROR/SUCCESS MESSAGES */}
+                {error && <p style={{ color: 'var(--error)', marginBottom: '1.5rem', textAlign: 'center', padding: '0.75rem', background: '#fef2f2', borderRadius: '8px' }}>{error}</p>}
+                {resetMsg && <p style={{ color: 'green', marginBottom: '1.5rem', textAlign: 'center', padding: '0.75rem', background: '#dcfce7', borderRadius: '8px' }}>{resetMsg}</p>}
 
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} suppressHydrationWarning>
-                        Log In
-                    </button>
-                </form>
-
-                <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
-                    <p>Don't have an account? <Link href="/register">Register here</Link></p>
-                </div>
-            </div>
-
-            {/* Test Credentials Panel */}
-            <div className="card" style={{ maxWidth: '350px', flex: '1', minWidth: '300px', backgroundColor: '#f8f9fa' }}>
-                <h3 style={{ marginTop: 0, fontSize: '1.2rem', color: '#2c3e50' }}>🧪 Test Credentials</h3>
-                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>Use these accounts to test different roles. Password is <strong>password123</strong> for all.</p>
-
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    {[
-                        { role: 'Admin', email: 'admin@drkal.com' },
-                        { role: 'Doctor', email: 'doctor@drkal.com' },
-                        { role: 'Nurse', email: 'nurse@drkal.com' },
-                        { role: 'Pharmacist', email: 'pharmacist@drkal.com' },
-                        { role: 'Lab Scientist', email: 'scientist@drkal.com' },
-                        { role: 'Dietician', email: 'dietician@drkal.com' },
-                        { role: 'Psychologist', email: 'psychologist@drkal.com' },
-                        { role: 'Patient (Generic)', email: 'patient@drkal.com' },
-                    ].map(creds => (
-                        <div key={creds.role} style={{
-                            marginBottom: '0.8rem',
-                            padding: '0.5rem',
-                            background: 'white',
-                            borderRadius: '4px',
-                            border: '1px solid #eee',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                        }}
-                            onClick={() => { setEmail(creds.email); setPassword('password123'); }}
-                            title="Click to auto-fill"
-                        >
-                            <div>
-                                <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{creds.role}</div>
-                                <div style={{ fontSize: '0.8rem', color: '#555' }}>{creds.email}</div>
+                {/* --- FORGOT PASSWORD FORM --- */}
+                {isForgotMode ? (
+                    resetStep === 1 ? (
+                        <form onSubmit={handleForgotRequest}>
+                            <p style={{ textAlign: 'center', color: '#666', marginBottom: '1.5rem' }}>Enter your email or phone number to receive a recovery code.</p>
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>Email Address or Phone Number</label>
+                                <input type="text" className="input-field" placeholder="Email or Phone (e.g. +233...)"
+                                    value={resetData.contact} onChange={(e) => setResetData({ ...resetData, contact: e.target.value })} required />
                             </div>
-                            <span style={{ fontSize: '1.2rem' }}>📋</span>
+                            <button type="submit" disabled={isResetting} className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: '700' }}>
+                                {isResetting ? 'Sending...' : 'Send OTP Code'}
+                            </button>
+                            <button type="button" onClick={() => setIsForgotMode(false)} style={{ width: '100%', marginTop: '1rem', background: 'none', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>Cancel</button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleForgotConfirm}>
+                            <p style={{ textAlign: 'center', color: '#666', marginBottom: '1.5rem' }}>Enter the 4-digit code and your new password.</p>
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>OTP Code</label>
+                                <input type="text" className="input-field" placeholder="XXXX"
+                                    value={resetData.otp} onChange={(e) => setResetData({ ...resetData, otp: e.target.value })} required />
+                            </div>
+                            <div style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>New Password</label>
+                                <Input
+                                    type="password"
+                                    placeholder="Min 6 chars"
+                                    minLength={6}
+                                    value={resetData.newPassword}
+                                    onChange={(e) => setResetData({ ...resetData, newPassword: e.target.value })}
+                                    required
+                                    fullWidth
+                                />
+                            </div>
+                            <button type="submit" disabled={isResetting} className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: '700' }}>
+                                {isResetting ? 'Resetting...' : 'Set New Password'}
+                            </button>
+                            <button type="button" onClick={() => setResetStep(1)} style={{ width: '100%', marginTop: '1rem', background: 'none', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>Back</button>
+                        </form>
+                    )
+                ) : (
+                    /* --- NORMAL LOGIN FORM --- */
+                    <form onSubmit={handleSubmit}>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--color-navy)' }}>Email Address or Member ID</label>
+                            <input type="text" className="input-field" placeholder="your@email.com or PATH0001"
+                                value={email} onChange={(e) => setEmail(e.target.value)} required suppressHydrationWarning />
                         </div>
-                    ))}
 
-                    <div style={{ borderTop: '1px solid #ddd', margin: '1rem 0', paddingTop: '0.5rem' }}>
-                        <h4 style={{ fontSize: '0.9rem', color: '#444', marginBottom: '0.5rem' }}>Start Patients (12)</h4>
-                        {[
-                            { name: 'Yaw Adom', email: 'yaw.adom.1768218659084@example.com' },
-                            { name: 'Kojo Boateng', email: 'kojo.boateng.1768218659385@example.com' },
-                            { name: 'Yaw Sarpong', email: 'yaw.sarpong.1768218659666@example.com' },
-                            { name: 'Abena Appiah', email: 'abena.appiah.1768218659690@example.com' },
-                            { name: 'Grace Boakye', email: 'grace.boakye.1768218659033@example.com' },
-                            { name: 'Grace Sarpong', email: 'grace.sarpong.1768218659202@example.com' },
-                            { name: 'Grace Sarpong (2)', email: 'grace.sarpong.1768218659282@example.com' },
-                            { name: 'Emmanuel Adom', email: 'emmanuel.adom.1768218659046@example.com' },
-                            { name: 'Kojo Mensah', email: 'kojo.mensah.1768218659160@example.com' },
-                            { name: 'Emmanuel Boakye', email: 'emmanuel.boakye.1768218659536@example.com' },
-                            { name: 'Abena Boakye', email: 'abena.boakye.1768218659060@example.com' },
-                            { name: 'Akosua Owusu', email: 'akosua.owusu.1768218659612@example.com' }
-                        ].map((p, idx) => (
-                            <div key={idx} style={{
-                                marginBottom: '0.5rem',
-                                padding: '0.4rem',
-                                background: '#f8f9fa',
-                                borderRadius: '4px',
-                                border: '1px solid #e9ecef',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}
-                                onClick={() => { setEmail(p.email); setPassword('password123'); }}
-                                title={`Click to login as ${p.name}`}
-                            >
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                                    <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{p.name}</div>
-                                    <div style={{ fontSize: '0.7rem', color: '#777' }}>{p.email}</div>
-                                </div>
-                                <span style={{ fontSize: '1rem' }}>👤</span>
+                        <div style={{ marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                <label style={{ fontWeight: '600', color: 'var(--color-navy)' }}>Password</label>
+                                <button type="button" onClick={() => setIsForgotMode(true)} style={{ background: 'none', border: 'none', color: 'var(--color-sea-blue)', fontWeight: '600', fontSize: '0.9rem', cursor: 'pointer' }}>Forgot?</button>
                             </div>
-                        ))}
+                            <Input
+                                type="password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                fullWidth
+                                suppressHydrationWarning
+                            />
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: '700' }} suppressHydrationWarning>
+                            Log In
+                        </button>
+                    </form>
+                )}
+
+                {!isForgotMode && (
+                    <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '1rem' }}>
+                        <p style={{ color: 'var(--text-secondary)' }}>
+                            Don't have an account? <Link href="/register" style={{ color: 'var(--color-sea-blue)', fontWeight: '700' }}>Register here</Link>
+                        </p>
                     </div>
-                </div>
-                <p style={{ textAlign: 'center', fontSize: '0.8rem', marginTop: '1rem', color: '#888' }}>Click any card to auto-fill</p>
+                )}
             </div>
         </div>
     );

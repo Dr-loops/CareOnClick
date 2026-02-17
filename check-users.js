@@ -2,34 +2,20 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function check() {
+async function main() {
     try {
-        console.log('Connecting to DB...');
-        const users = await prisma.user.findMany({
-            take: 3
-        });
-        console.log('Users found:', users.length);
+        console.log('--- Checking Users in DB ---');
+        const users = await prisma.user.findMany();
+        console.log(`Found ${users.length} users.`);
         if (users.length > 0) {
-            console.log('First User:', users[0]);
-        } else {
-            console.log('No users found. Creating a test patient...');
-            // Create a dummy patient if none exists
-            const newPatient = await prisma.user.create({
-                data: {
-                    email: `patient-${Date.now()}@example.com`,
-                    password: 'hashed-password',
-                    name: 'Test Patient',
-                    role: 'PATIENT',
-                    pathNumber: `PATH-${Date.now()}`
-                }
+            users.forEach(user => {
+                console.log(`- ${user.name} (${user.email}) - Role: ${user.role}`);
             });
-            console.log('Created User:', newPatient);
         }
-    } catch (e) {
-        console.error('DB Error:', e);
-    } finally {
-        await prisma.$disconnect();
+    } catch (err) {
+        console.error('ERROR during check:', err);
     }
 }
 
-check();
+main()
+    .finally(() => prisma.$disconnect());

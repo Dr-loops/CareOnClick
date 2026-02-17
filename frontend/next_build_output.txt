@@ -1,4 +1,0 @@
-﻿   ▲ Next.js 15.5.9
-   - Environments: .env
-
-   Creating an optimized production build ...

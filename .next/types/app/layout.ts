@@ -1,4 +1,4 @@
-// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\app\layout.js
+// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital_clone\frontend\app\layout.js
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

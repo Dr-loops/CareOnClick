@@ -28,7 +28,7 @@ export default function PatientDashboard({ user }) {
     const [appointmentTime, setAppointmentTime] = useState('');
     const [appointmentType, setAppointmentType] = useState('Video'); // 'Video' or 'In-person'
     const [paymentMode, setPaymentMode] = useState('Full'); // 'Full' or 'Part'
-    const [paymentAmount, setPaymentAmount] = useState(155); // Default GHS 155.00
+    const [paymentAmount, setPaymentAmount] = useState(0); // Default to 0, will be updated during booking
     const [billPaymentMode, setBillPaymentMode] = useState('Full');
     const [billPaymentAmount, setBillPaymentAmount] = useState(0);
     const [selectedRegion, setSelectedRegion] = useState('All');
@@ -39,11 +39,12 @@ export default function PatientDashboard({ user }) {
     const ghanaRegions = POPULAR_REGIONS['Ghana'] || [];
 
     // Persistent Profile Logic
-    const patientId = user.pathNumber || user.id || 'PAT-TEMP';
+    // Fix: Prioritize user.id (Session) over pathNumber to match Backend DB. Avoid 'PAT-TEMP' for authenticated users.
+    const patientId = user.id || user.pathNumber;
     const { latestVital } = useVitals(patientId);
 
     const [profile, setProfile] = useState(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && patientId) { // Only load if we have a valid ID
             const saved = JSON.parse(localStorage.getItem(KEYS.PATIENT_PROFILES) || '{}');
             return saved[patientId] || {};
         }
@@ -64,6 +65,11 @@ export default function PatientDashboard({ user }) {
     const [replyingTo, setReplyingTo] = useState(null); // ID of the message being replied to
     const [replyContent, setReplyContent] = useState('');
     const [isSendingReply, setIsSendingReply] = useState(false);
+
+    // Profile & Security State
+    const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [profileStatus, setProfileStatus] = useState({ type: '', message: '' });
 
     // Fetch Appointments from API
     const fetchAppointments = async () => {
@@ -184,6 +190,19 @@ export default function PatientDashboard({ user }) {
                 setToast({ message: 'Reply sent successfully!', type: 'success' });
                 setReplyContent('');
                 setReplyingTo(null);
+
+                // [NEW] Real-time Socket Notification to Professional
+                const socket = getSocket();
+                if (socket) {
+                    socket.emit('send_message', {
+                        recipientId: recipientId,
+                        senderId: user.id,
+                        senderName: profile.fullName || user.name,
+                        content: replyContent,
+                        type: 'CHAT'
+                    });
+                }
+
                 fetchMessages();
             } else {
                 setToast({ message: 'Failed to send reply', type: 'error' });
@@ -206,35 +225,43 @@ export default function PatientDashboard({ user }) {
 
                 if (serverProfile || serverUser) {
                     const mergedProfile = {
-                        // Base: User Session Data (least priority for mutable fields but good for defaults)
-                        fullName: user.name,
-                        email: user.email,
+                        // Base: User Session Data
+                        fullName: serverUser?.name || user.name,
+                        email: serverUser?.email || user.email,
+                        id: serverUser?.id || user.id,
+                        pathNumber: serverUser?.pathNumber || user.pathNumber,
 
-                        // Layer 1: Server User Data (Has region, country, phoneNumber)
-                        ...serverUser,
+                        // Layer 1: Server User Data
+                        phoneNumber: serverUser?.phoneNumber,
+                        whatsappNumber: serverUser?.whatsappNumber,
+                        region: serverUser?.region,
+                        country: serverUser?.country || 'Ghana',
+                        address: serverUser?.address,
+                        avatarUrl: serverUser?.avatarUrl,
 
-                        // Layer 2: Server Profile Data (Has address, medical history, specialized fields)
+                        // Layer 2: Server Profile Data (Overrides & Medical)
                         ...(serverProfile || {}),
 
-                        // Explicit Field Mapping & Overrides
+                        // Explicit Mapping & Aliases for UI consistency
                         phone: serverUser?.phoneNumber || serverProfile?.phoneNumber || user.phone,
-                        region: serverUser?.region || serverProfile?.region || user.region,
-                        country: serverUser?.country || user.country || 'Ghana',
-
-                        // Map Profile Specifics
+                        sex: serverProfile?.gender || serverUser?.gender || 'Not Set',
+                        gender: serverProfile?.gender || serverUser?.gender || 'Not Set',
                         dob: serverProfile?.dateOfBirth,
-                        gender: serverProfile?.gender || serverProfile?.sex || serverUser?.gender
                     };
 
-                    if (serverProfile?.dateOfBirth && !mergedProfile.age) {
-                        // Recalculate age if missing but DOB exists
-                        const dob = new Date(serverProfile.dateOfBirth);
-                        const diff_ms = Date.now() - dob.getTime();
-                        const age_dt = new Date(diff_ms);
-                        mergedProfile.age = Math.abs(age_dt.getUTCFullYear() - 1970);
+                    // Robust Age Calculation
+                    if (mergedProfile.dateOfBirth) {
+                        const dob = new Date(mergedProfile.dateOfBirth);
+                        const today = new Date();
+                        let age = today.getFullYear() - dob.getFullYear();
+                        const m = today.getMonth() - dob.getMonth();
+                        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                            age--;
+                        }
+                        mergedProfile.age = age;
                     }
 
-                    setProfile(prev => ({ ...prev, ...mergedProfile }));
+                    setProfile(mergedProfile);
 
                     // Update LocalStorage to keep sync
                     const saved = JSON.parse(localStorage.getItem(KEYS.PATIENT_PROFILES) || '{}');
@@ -244,6 +271,96 @@ export default function PatientDashboard({ user }) {
             }
         } catch (e) {
             console.error("Failed to fetch profile", e);
+        }
+    };
+
+    const handleAvatarUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Check file size (limit to 1MB for Base64 storage)
+        if (file.size > 1024 * 1024) {
+            setProfileStatus({ type: 'error', message: 'Image too large. Please select an image under 1MB.' });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setProfile(prev => ({ ...prev, avatarUrl: reader.result }));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleUpdateProfile = async (e) => {
+        if (e) e.preventDefault();
+        setProfileLoading(true);
+        setProfileStatus({ type: '', message: '' });
+
+        try {
+            // 1. Prepare Payload for Hybrid Update (User + Profile)
+            const payload = {
+                ...profile,
+                name: (profile.fullName || profile.name || user.name || '').trim(),
+                phoneNumber: profile.phone || profile.phoneNumber,
+                whatsappNumber: profile.whatsappNumber,
+                region: profile.region,
+                country: profile.country,
+                address: profile.address,
+                gender: profile.sex || profile.gender,
+                avatarUrl: profile.avatarUrl,
+                age: profile.age // Send age for fallback calc if dob missing
+            };
+
+            if (!payload.name) {
+                throw new Error("Full Name is required.");
+            }
+
+            // 2. Add password if provided
+            if (passwords.new) {
+                if (passwords.new !== passwords.confirm) {
+                    throw new Error("New passwords do not match");
+                }
+                payload.password = passwords.new;
+            }
+
+            // 3. Sync to Server via specialized multi-table handler
+            const res = await fetch('/api/db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    collection: 'patient_profiles',
+                    action: 'save',
+                    id: patientId,
+                    item: payload
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || "Failed to update profile");
+            }
+
+            // 4. Update Local Identity for UI session sync
+            await fetch('/api/user/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: payload.name,
+                    phoneNumber: payload.phoneNumber,
+                    avatarUrl: payload.avatarUrl
+                })
+            }).catch(e => console.error("Identity sync error", e));
+
+            setProfileStatus({ type: 'success', message: 'Profile updated successfully!' });
+            setPasswords({ current: '', new: '', confirm: '' });
+
+            // Refresh local state immediately
+            setTimeout(fetchProfile, 500);
+        } catch (err) {
+            console.error("Profile Update Error:", err);
+            setProfileStatus({ type: 'error', message: err.message });
+        } finally {
+            setProfileLoading(false);
         }
     };
 
@@ -349,7 +466,7 @@ export default function PatientDashboard({ user }) {
 
             socket.on('receive_message', (data) => {
                 dispatchSync();
-                setToast({ message: `New message from ${data.senderName || 'Dr. Kal'}`, type: 'info' });
+                setToast({ message: `New message from ${data.senderName || 'CareOnClick'}`, type: 'info' });
             });
 
             return () => {
@@ -387,8 +504,8 @@ export default function PatientDashboard({ user }) {
 
             {/* Print Header */}
             <div className="print-only" style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                <img src="/logo.png" alt="Dr Kal Logo" style={{ height: '80px', marginBottom: '1rem' }} />
-                <h1 style={{ margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '80px', marginBottom: '1rem' }} />
+                <h1 style={{ margin: 0 }}>CAREONCLICK</h1>
                 <h2 style={{ margin: '0.5rem 0' }}>PATIENT OFFICIAL RECORD</h2>
                 <p style={{ fontSize: '0.9rem' }}>Date: {new Date().toLocaleDateString()} | Time: {new Date().toLocaleTimeString()}</p>
             </div>
@@ -396,10 +513,24 @@ export default function PatientDashboard({ user }) {
             {/* Sidebar */}
             <aside className="card" style={{ height: 'fit-content', padding: '1rem' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ width: '80px', height: '80px', background: 'var(--color-cyan-sand)', borderRadius: '50%', margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                        👤
+                    <div
+                        onClick={() => setActiveTab('settings')}
+                        style={{
+                            width: '90px', height: '90px', background: 'var(--color-cyan-sand)', borderRadius: '50%',
+                            margin: '0 auto 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '2rem', cursor: 'pointer', border: activeTab === 'settings' ? '3px solid var(--color-navy)' : '2px solid transparent',
+                            transition: 'all 0.2s', overflow: 'hidden', position: 'relative'
+                        }}
+                        title="Click to edit profile"
+                    >
+                        {profile.avatarUrl ? (
+                            <img src={profile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <img src="/logo_new.jpg" alt="Logo" style={{ width: '50px', height: '50px' }} />
+                        )}
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: '10px', padding: '2px 0', opacity: 0.8 }}>EDIT</div>
                     </div>
-                    <h3>{displayName}</h3>
+                    <h3 style={{ cursor: 'pointer' }} onClick={() => setActiveTab('settings')}>{displayName}</h3>
                     <p style={{ color: 'var(--text-secondary)' }}>Patient ID: {displayId}</p>
                 </div>
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -413,6 +544,7 @@ export default function PatientDashboard({ user }) {
                     <button onClick={() => setActiveTab('alerts')} className={`btn ${activeTab === 'alerts' ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', justifyContent: 'flex-start', color: messages.some(m => m.type === 'ALERT') ? 'red' : 'inherit' }}>
                         Alerts & Messages {messages.some(m => m.type === 'ALERT') && '⚠️'}
                     </button>
+                    <button onClick={() => setActiveTab('settings')} className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', justifyContent: 'flex-start' }}>⚙️ Profile Settings</button>
                 </nav>
             </aside>
 
@@ -421,130 +553,257 @@ export default function PatientDashboard({ user }) {
                 {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
                 {activeTab === 'overview' && (
                     <div className="card">
-                        <h2 style={{ color: 'var(--color-navy)', marginBottom: '1.5rem' }}>Personal Information</h2>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            savePatientProfile(patientId, profile);
-                            setToast({ message: 'Profile updated successfully!', type: 'success' });
-                        }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ color: 'var(--color-navy)', margin: 0 }}>Personal Information</h2>
+                            <button onClick={() => setActiveTab('settings')} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>Edit Details & Password</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Full Name</label>
-                                <input
-                                    type="text"
-                                    name="fullName"
-                                    value={profile.fullName || user.name || ''}
-                                    onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Full Name</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.fullName || user.name}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Sex</label>
-                                <select
-                                    name="sex"
-                                    className="input"
-                                    value={profile.sex || profile.gender || ""}
-                                    onChange={(e) => setProfile({ ...profile, sex: e.target.value, gender: e.target.value })}
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                >
-                                    <option value="">Select Sex</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Sex</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.sex || profile.gender || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Age</label>
-                                <input
-                                    type="number"
-                                    name="age"
-                                    value={profile.age || ""}
-                                    onChange={(e) => setProfile({ ...profile, age: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Age</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.age || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Phone Number</label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={profile.phone || profile.phoneNumber || ""}
-                                    onChange={(e) => setProfile({ ...profile, phone: e.target.value, phoneNumber: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Phone Number</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.phone || profile.phoneNumber || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: 'span 2' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Email Address</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={profile.email || user.email || ''}
-                                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Email Address</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.email || user.email}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: 'span 2' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Residential Address</label>
-                                <textarea
-                                    name="address"
-                                    value={profile.address || ""}
-                                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd', minHeight: '80px' }}
-                                ></textarea>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Residential Address</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', minHeight: '60px' }}>{profile.address || 'Not Set'}</div>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Region (Ghana)</label>
-                                <select
-                                    name="region"
-                                    value={profile.region || ""}
-                                    onChange={(e) => setProfile({ ...profile, region: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>WhatsApp Number</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.whatsappNumber || 'Not Set'}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Region (Ghana)</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.region || 'Not Set'}</div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b' }}>Country</label>
+                                <div style={{ padding: '0.8rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>{profile.country || 'Ghana'}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div className="card">
+                        <h2 style={{ color: 'var(--color-navy)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            ⚙️ Profile & Security Settings
+                        </h2>
+
+                        {profileStatus.message && (
+                            <div style={{
+                                padding: '1rem', marginBottom: '1.5rem', borderRadius: '8px',
+                                background: profileStatus.type === 'success' ? '#f0fdf4' : '#fef2f2',
+                                color: profileStatus.type === 'success' ? '#16a34a' : '#dc2626',
+                                border: `1px solid ${profileStatus.type === 'success' ? '#bbf7d0' : '#fecaca'}`
+                            }}>
+                                {profileStatus.message}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleUpdateProfile}>
+                            {/* Profile Picture Section */}
+                            <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                    <div style={{ position: 'relative', width: '120px', height: '120px' }}>
+                                        <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#fff', border: '2px solid var(--color-navy)', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                                            {profile.avatarUrl ? (
+                                                <img src={profile.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', background: '#f1f5f9' }}>
+                                                    <span style={{ fontSize: '2.5rem' }}>👤</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <label
+                                            htmlFor="avatar-upload"
+                                            style={{
+                                                position: 'absolute', bottom: '5px', right: '5px',
+                                                background: 'var(--color-navy)', color: 'white',
+                                                width: '32px', height: '32px', borderRadius: '50%',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                                fontSize: '1.2rem', border: '2px solid white'
+                                            }}
+                                            title="Upload from device"
+                                        >
+                                            📷
+                                            <input
+                                                id="avatar-upload"
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleAvatarUpload}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b' }}>Upload Photo</h4>
+                                        <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem 0' }}>
+                                            Pick a clear photo from your device. Maximun size 1MB.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => document.getElementById('avatar-upload').click()}
+                                                className="btn btn-secondary"
+                                                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+                                            >
+                                                Choose File
+                                            </button>
+                                            {profile.avatarUrl && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setProfile({ ...profile, avatarUrl: '' })}
+                                                    className="btn btn-secondary"
+                                                    style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', color: '#dc2626' }}
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Personal Details Section */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={profile.fullName || profile.name || ''}
+                                        onChange={(e) => setProfile({ ...profile, fullName: e.target.value, name: e.target.value })}
+                                        className="input"
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Sex</label>
+                                    <select
+                                        className="input"
+                                        value={profile.sex || profile.gender || ""}
+                                        onChange={(e) => setProfile({ ...profile, sex: e.target.value, gender: e.target.value })}
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    >
+                                        <option value="">Select Sex</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={profile.phone || profile.phoneNumber || ""}
+                                        onChange={(e) => setProfile({ ...profile, phone: e.target.value, phoneNumber: e.target.value })}
+                                        className="input"
+                                        required
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>WhatsApp Number</label>
+                                    <input
+                                        type="tel"
+                                        value={profile.whatsappNumber || ""}
+                                        onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })}
+                                        className="input"
+                                        placeholder="+233..."
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Region (Ghana)</label>
+                                    <select
+                                        className="input"
+                                        value={profile.region || ""}
+                                        onChange={(e) => setProfile({ ...profile, region: e.target.value })}
+                                        style={{ padding: '0.8rem' }}
+                                    >
+                                        <option value="">Select Region</option>
+                                        {ghanaRegions.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        value={profile.dob ? new Date(profile.dob).toISOString().split('T')[0] : ""}
+                                        onChange={(e) => setProfile({ ...profile, dob: e.target.value, dateOfBirth: e.target.value })}
+                                        className="input"
+                                        style={{ padding: '0.8rem' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', gridColumn: 'span 2' }}>
+                                    <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Residential Address</label>
+                                    <textarea
+                                        value={profile.address || ""}
+                                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                                        className="input"
+                                        style={{ padding: '0.8rem', minHeight: '60px' }}
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            {/* Security Section */}
+                            <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '2rem' }}>
+                                <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#1e293b' }}>🔐 Security Settings</h3>
+                                <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>Leave blank if you don't want to change your password.</p>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>New Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Min 6 characters"
+                                            value={passwords.new}
+                                            onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                                            className="input"
+                                            style={{ padding: '0.8rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                        <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Confirm New Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Repeat new password"
+                                            value={passwords.confirm}
+                                            onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                                            className="input"
+                                            style={{ padding: '0.8rem' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '2.5rem' }}>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    style={{ width: '100%', padding: '1.2rem', fontSize: '1.1rem' }}
+                                    disabled={profileLoading}
                                 >
-                                    <option value="">Select Region</option>
-                                    <option value="Ahafo">Ahafo</option>
-                                    <option value="Ashanti">Ashanti</option>
-                                    <option value="Bono">Bono</option>
-                                    <option value="Bono East">Bono East</option>
-                                    <option value="Central">Central</option>
-                                    <option value="Eastern">Eastern</option>
-                                    <option value="Greater Accra">Greater Accra</option>
-                                    <option value="North East">North East</option>
-                                    <option value="Northern">Northern</option>
-                                    <option value="Oti">Oti</option>
-                                    <option value="Savannah">Savannah</option>
-                                    <option value="Upper East">Upper East</option>
-                                    <option value="Upper West">Upper West</option>
-                                    <option value="Volta">Volta</option>
-                                    <option value="Western">Western</option>
-                                    <option value="Western North">Western North</option>
-                                </select>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Current Country</label>
-                                <input
-                                    type="text"
-                                    name="country"
-                                    value={profile.country || "Ghana"}
-                                    onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                                    className="input"
-                                    required
-                                    style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}
-                                />
-                            </div>
-                            <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
-                                <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem' }}>Save & Update Profile</button>
+                                    {profileLoading ? '⌛ Saving Changes...' : '💾 Save & Update All Information'}
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -720,6 +979,40 @@ export default function PatientDashboard({ user }) {
                                                     <button onClick={() => setAppointmentType('In-person')} className={`btn ${appointmentType === 'In-person' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }}>🏥 In-person</button>
                                                 </div>
                                             </div>
+
+                                            {/* [NEW] Payment Summary */}
+                                            {(() => {
+                                                const FEES = {
+                                                    'Physician': 400,
+                                                    'Scientist': 250,
+                                                    'Nurse': 200,
+                                                    'Dietician': 200,
+                                                    'Pharmacist': 250,
+                                                    'Psychologist': 250
+                                                };
+                                                // Default to 150 if category unknown
+                                                const fee = FEES[selectedProfessional.category] || 150;
+
+                                                return (
+                                                    <div className="card" style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '1.5rem', marginTop: '1rem' }}>
+                                                        <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>🧾 Bill Summary</h4>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                            <span style={{ color: '#64748b' }}>Consultation Fee ({selectedProfessional.category})</span>
+                                                            <span style={{ fontWeight: 600 }}>GHS {fee}.00</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                            <span style={{ color: '#64748b' }}>Service Charge</span>
+                                                            <span style={{ fontWeight: 600 }}>GHS 0.00</span>
+                                                        </div>
+                                                        <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.5rem 0' }}></div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', color: '#0f172a' }}>
+                                                            <strong>Total Payable</strong>
+                                                            <strong>GHS {fee}.00</strong>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
                                             <button
                                                 className="btn btn-primary"
                                                 style={{ padding: '1rem', marginTop: '1rem' }}
@@ -728,11 +1021,6 @@ export default function PatientDashboard({ user }) {
                                                     !appointmentTime ||
                                                     (() => {
                                                         const allApps = apiAppointments;
-                                                        // Re-calculate formatted time for check
-                                                        // Note: This logic verifies if user already has an appointment at this time with this professional
-                                                        // It doesn't check server-side availability yet beyond what we fetched?
-                                                        // Ideally availability check should be an API call.
-                                                        // For now, we check against known appointments in state.
                                                         const [hours, mins] = appointmentTime.split(':');
                                                         const h = parseInt(hours);
                                                         const ampm = h >= 12 ? 'PM' : 'AM';
@@ -749,14 +1037,24 @@ export default function PatientDashboard({ user }) {
                                                     })()
                                                 }
                                                 onClick={async () => {
-                                                    // const { getBookingCount } = require('@/lib/global_sync'); 
-                                                    // Skip booking count check for now or handle via API response
+                                                    // Recalculate Fee Logic for Submission
+                                                    const FEES = {
+                                                        'Physician': 400,
+                                                        'Scientist': 250,
+                                                        'Nurse': 200,
+                                                        'Dietician': 200,
+                                                        'Pharmacist': 250,
+                                                        'Psychologist': 250
+                                                    };
+                                                    const fee = FEES[selectedProfessional.category] || 150;
 
                                                     // Format Time (24h + AM/PM)
                                                     const [hours, mins] = appointmentTime.split(':');
                                                     const h = parseInt(hours);
                                                     const ampm = h >= 12 ? 'PM' : 'AM';
                                                     const finalTime = `${hours}:${mins} ${ampm}`;
+
+                                                    if (!confirm(`Confirm booking with ${selectedProfessional.name} for GHS ${fee}?`)) return;
 
                                                     try {
                                                         const res = await fetch('/api/appointments', {
@@ -768,15 +1066,42 @@ export default function PatientDashboard({ user }) {
                                                                 professionalCategory: selectedProfessional.category,
                                                                 date: appointmentDate,
                                                                 time: finalTime,
-                                                                type: appointmentType, // Video or In-person
-                                                                amountPaid: 0,
-                                                                balanceDue: 155,
+                                                                type: appointmentType,
+                                                                amountPaid: 0, // Pay later flow
+                                                                balanceDue: fee, // Dynamic Fee
                                                             })
                                                         });
                                                         if (res.ok) {
-                                                            setPaymentAmount(0);
+                                                            // [NEW] Real-time Notification
+                                                            const socket = getSocket();
+                                                            if (socket) {
+                                                                socket.emit('new_appointment', {
+                                                                    professionalId: selectedProfessional.id,
+                                                                    patientName: profile.fullName || user.name,
+                                                                    date: appointmentDate,
+                                                                    time: finalTime,
+                                                                    type: appointmentType
+                                                                });
+                                                            }
+
+                                                            // [NEW] Sync with Admin Financial Audit Log
+                                                            if (typeof window !== 'undefined') {
+                                                                const logs = JSON.parse(localStorage.getItem('dr_kal_audit_logs') || '[]');
+                                                                logs.push({
+                                                                    timestamp: new Date().toISOString(),
+                                                                    action: 'BILLING_GENERATED',
+                                                                    actorName: profile.fullName || user.name || 'Patient',
+                                                                    targetName: selectedProfessional.name,
+                                                                    details: `Invoice generated: GHS ${fee}.00 for ${selectedProfessional.category} Consultation`,
+                                                                    notes: `Booking Ref: ${Math.floor(Math.random() * 10000)}`,
+                                                                    id: Date.now()
+                                                                });
+                                                                localStorage.setItem('dr_kal_audit_logs', JSON.stringify(logs));
+                                                            }
+
+                                                            setPaymentAmount(0); // Reset local state
                                                             setAppointmentView('success');
-                                                            fetchAppointments(); // Refresh list
+                                                            fetchAppointments();
                                                         } else {
                                                             const errData = await res.json().catch(() => ({}));
                                                             alert(`Failed to book appointment: ${errData.error || 'Unknown error'}`);
@@ -787,7 +1112,7 @@ export default function PatientDashboard({ user }) {
                                                     }
                                                 }}
                                             >
-                                                Confirm Appointment
+                                                Confirm & Book Appointment
                                             </button>
                                         </div>
                                     </div>
@@ -824,15 +1149,31 @@ export default function PatientDashboard({ user }) {
                                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Amount Paid</div>
                                                     <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#15803d' }}>GHS {paymentAmount.toFixed(2)}</div>
                                                 </div>
-                                                {paymentAmount < 155 && (
-                                                    <div>
-                                                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Balance Due</div>
-                                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#dc2626' }}>GHS {(155 - paymentAmount).toFixed(2)}</div>
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    const FEES = {
+                                                        'Physician': 400,
+                                                        'Scientist': 250,
+                                                        'Nurse': 200,
+                                                        'Dietician': 200,
+                                                        'Pharmacist': 250,
+                                                        'Psychologist': 250
+                                                    };
+                                                    const fee = FEES[selectedProfessional?.category] || 150;
+                                                    const balance = fee - paymentAmount;
+
+                                                    if (balance > 0) {
+                                                        return (
+                                                            <div>
+                                                                <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Balance Due</div>
+                                                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#dc2626' }}>GHS {balance.toFixed(2)}</div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
                                                 <div>
                                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Professional</div>
-                                                    <div style={{ fontWeight: 'bold' }}>{selectedProfessional?.name || 'Dr. Kal'}</div>
+                                                    <div style={{ fontWeight: 'bold' }}>{selectedProfessional?.name || 'CareOnClick'}</div>
                                                 </div>
                                                 <div>
                                                     <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.3rem' }}>Date & Time</div>
@@ -1136,67 +1477,110 @@ export default function PatientDashboard({ user }) {
                     <div className="card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                             <h2>Alerts & Messages</h2>
-                            <button className="btn btn-secondary" onClick={fetchMessages}>REFRESH ↻</button>
+                            <button className="btn btn-secondary" onClick={() => { fetchMessages(); fetchAppointments(); fetchRecords(); }}>REFRESH ↻</button>
                         </div>
 
-                        {loadingMessages ? <p>Loading messages...</p> : (
+                        {loadingMessages ? <p>Loading alerts...</p> : (
                             <div className="flex flex-col gap-4">
-                                {messages.length === 0 ? (
-                                    <p className="text-gray-500 text-center py-10">No messages or alerts.</p>
-                                ) : (
-                                    messages.map(msg => (
-                                        <div key={msg.id} style={{
+                                {(() => {
+                                    // Merge Messages, Appointments, and Records into a unified timeline
+                                    const allAlerts = [
+                                        ...messages.map(m => ({
+                                            ...m,
+                                            alertType: 'MESSAGE',
+                                            displayTitle: `Message from ${m.senderName}`,
+                                            displayMessage: m.content,
+                                            displayTime: m.timestamp || m.createdAt,
+                                        })),
+                                        ...apiAppointments
+                                            .filter(a => a.status === 'Upcoming' || a.status === 'Pending')
+                                            .map(a => ({
+                                                id: `app-${a.id}`,
+                                                alertType: 'APPOINTMENT',
+                                                displayTitle: `Appointment: ${a.status}`,
+                                                displayMessage: `Session with ${a.professionalName} on ${new Date(a.date).toLocaleDateString()} at ${a.time}`,
+                                                displayTime: a.updatedAt || a.date,
+                                                linkTab: 'appointments'
+                                            })),
+                                        ...apiRecords.slice(0, 5).map(r => ({
+                                            id: `rec-${r.id}`,
+                                            alertType: 'RECORD',
+                                            displayTitle: 'New Health Record Available',
+                                            displayMessage: `${r.fileName} published by ${r.professionalName}`,
+                                            displayTime: r.timestamp || r.date,
+                                            linkTab: 'records'
+                                        }))
+                                    ].sort((a, b) => new Date(b.displayTime) - new Date(a.displayTime));
+
+                                    if (allAlerts.length === 0) {
+                                        return <p className="text-gray-500 text-center py-10">No messages or alerts.</p>;
+                                    }
+
+                                    return allAlerts.map(alertItem => (
+                                        <div key={alertItem.id} style={{
                                             padding: '1.5rem',
                                             borderRadius: '8px',
-                                            border: msg.type === 'ALERT' ? '2px solid #fee2e2' : '1px solid #e2e8f0',
-                                            background: msg.type === 'ALERT' ? '#fef2f2' : '#ffffff',
+                                            border: alertItem.type === 'ALERT' ? '2px solid #fee2e2' : '1px solid #e2e8f0',
+                                            background: alertItem.type === 'ALERT' ? '#fef2f2' : '#ffffff',
                                             marginBottom: '1rem'
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                                 <span className="font-bold flex flex-col gap-1">
-                                                    {msg.type === 'ALERT' && <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '5px' }}>⚠️ URGENT ALERT</span>}
+                                                    {alertItem.type === 'ALERT' && <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '5px' }}>⚠️ URGENT ALERT</span>}
                                                     <span style={{ fontSize: '0.95rem', color: '#334155' }}>
-                                                        From: <strong>{msg.senderName}</strong> <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal', textTransform: 'capitalize' }}>({msg.role?.toLowerCase() || 'staff'})</span>
+                                                        {alertItem.displayTitle}
+                                                        {alertItem.alertType === 'MESSAGE' && (
+                                                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal', textTransform: 'capitalize' }}> ({alertItem.role?.toLowerCase() || 'staff'})</span>
+                                                        )}
                                                     </span>
                                                 </span>
-                                                <span className="text-gray-500 text-sm">{new Date(msg.createdAt).toLocaleString()}</span>
+                                                <span className="text-gray-500 text-sm">{new Date(alertItem.displayTime).toLocaleString()}</span>
                                             </div>
-                                            <p style={{ fontSize: '1.1rem', color: msg.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0' }}>
-                                                {msg.content}
+                                            <p style={{ fontSize: '1.1rem', color: alertItem.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0' }}>
+                                                {alertItem.displayMessage}
                                             </p>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                                                Type: {msg.type}
-                                            </div>
 
                                             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-                                                <button
-                                                    onClick={() => {
-                                                        if (replyingTo === msg.id) {
-                                                            setReplyingTo(null);
-                                                        } else {
-                                                            setReplyingTo(msg.id);
-                                                            setReplyContent('');
-                                                        }
-                                                    }}
-                                                    className="btn"
-                                                    style={{ border: '1px solid #e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#475569' }}
-                                                >
-                                                    {replyingTo === msg.id ? 'Cancel' : '💬 Reply'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteMessage(msg.id)}
-                                                    className="btn"
-                                                    style={{ border: '1px solid #fee2e2', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#dc2626' }}
-                                                >
-                                                    🗑️ Delete
-                                                </button>
+                                                {alertItem.alertType === 'MESSAGE' ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (replyingTo === alertItem.id) {
+                                                                    setReplyingTo(null);
+                                                                } else {
+                                                                    setReplyingTo(alertItem.id);
+                                                                    setReplyContent('');
+                                                                }
+                                                            }}
+                                                            className="btn"
+                                                            style={{ border: '1px solid #e2e8f0', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#475569' }}
+                                                        >
+                                                            {replyingTo === alertItem.id ? 'Cancel' : '💬 Reply'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteMessage(alertItem.id)}
+                                                            className="btn"
+                                                            style={{ border: '1px solid #fee2e2', fontSize: '0.85rem', padding: '0.4rem 0.8rem', color: '#dc2626' }}
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setActiveTab(alertItem.linkTab)}
+                                                        className="btn btn-secondary"
+                                                        style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            {replyingTo === msg.id && (
+                                            {replyingTo === alertItem.id && (
                                                 <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                                     <textarea
                                                         className="input"
-                                                        placeholder={`Reply to ${msg.senderName}...`}
+                                                        placeholder={`Reply to ${alertItem.senderName}...`}
                                                         value={replyContent}
                                                         onChange={(e) => setReplyContent(e.target.value)}
                                                         style={{ width: '100%', minHeight: '80px', marginBottom: '0.8rem', padding: '0.8rem' }}
@@ -1205,7 +1589,7 @@ export default function PatientDashboard({ user }) {
                                                         <button
                                                             className="btn btn-primary"
                                                             disabled={isSendingReply || !replyContent.trim()}
-                                                            onClick={() => handleSendReply(msg.senderId, msg)}
+                                                            onClick={() => handleSendReply(alertItem.senderId, alertItem)}
                                                             style={{ fontSize: '0.85rem', padding: '0.4rem 1.2rem' }}
                                                         >
                                                             {isSendingReply ? 'Sending...' : 'Send Reply'}
@@ -1214,8 +1598,8 @@ export default function PatientDashboard({ user }) {
                                                 </div>
                                             )}
                                         </div>
-                                    ))
-                                )}
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>
@@ -1343,8 +1727,8 @@ export default function PatientDashboard({ user }) {
                                             </head>
                                             <body>
                                                 <div class="header">
-                                                    <img src="${window.location.origin}/logo.png" alt="Logo" style="height: 80px; margin-bottom: 10px;">
-                                                    <div class="logo">DR. KAL'S VIRTUAL HOSPITAL</div>
+                                                    <img src="${window.location.origin}/logo_new.jpg" alt="Logo" style="height: 80px; margin-bottom: 10px;">
+                                                    <div class="logo">CAREONCLICK</div>
                                                     <div>OFFICIAL LABORATORY REPORT</div>
                                                 </div>
                                                 
@@ -1501,9 +1885,23 @@ export default function PatientDashboard({ user }) {
                         // Use API appointments for billing calculation
                         const myApps = apiAppointments.filter(a => a.status !== 'Cancelled');
 
-                        const totalBilled = myApps.length * 155;
+                        const FEES = {
+                            'Physician': 400,
+                            'Scientist': 250,
+                            'Nurse': 200,
+                            'Dietician': 200,
+                            'Pharmacist': 250,
+                            'Psychologist': 250
+                        };
+
+                        const totalBilled = myApps.reduce((sum, app) => {
+                            return sum + (FEES[app.professionalCategory] || 150);
+                        }, 0);
                         const totalPaid = myApps.reduce((sum, app) => sum + (app.amountPaid || 0), 0);
-                        const totalOutstanding = myApps.reduce((sum, app) => sum + (parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? 155 : 0)), 0);
+                        const totalOutstanding = myApps.reduce((sum, app) => {
+                            const fee = FEES[app.professionalCategory] || 150;
+                            return sum + (parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? fee : 0));
+                        }, 0);
 
                         return (
                             <div>
@@ -1593,12 +1991,14 @@ export default function PatientDashboard({ user }) {
                                                 const allApps = JSON.parse(localStorage.getItem(KEYS.APPOINTMENTS) || '[]');
 
                                                 // 2. Identify Unpaid Appointments (FIFO)
+                                                // 2. Identify Unpaid Appointments (FIFO)
                                                 // Filter for THIS patient and UNPAID items
                                                 let remainingDistribute = paymentValue;
                                                 const updatedApps = allApps.map(app => {
                                                     // Only touch appointments for this patient that have debt
                                                     if (app.patientId === patientId && app.status !== 'Cancelled') {
-                                                        const currentBalance = parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? 155 : 0);
+                                                        const fee = FEES[app.professionalCategory] || 150;
+                                                        const currentBalance = parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? fee : 0);
 
                                                         if (currentBalance > 0 && remainingDistribute > 0) {
                                                             const payAmount = Math.min(remainingDistribute, currentBalance);
@@ -1669,32 +2069,38 @@ export default function PatientDashboard({ user }) {
                                                 {myApps.length === 0 ? (
                                                     <tr><td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>No transactions found.</td></tr>
                                                 ) : (
-                                                    myApps.map(app => (
-                                                        <tr key={app.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                            <td style={{ padding: '1rem' }}>{new Date(app.date).toLocaleDateString()}</td>
-                                                            <td style={{ padding: '1rem' }}>{app.type} Visit</td>
-                                                            <td style={{ padding: '1rem' }}>{app.professionalName}</td>
-                                                            <td style={{ padding: '1rem' }}>
-                                                                <span style={{
-                                                                    padding: '0.25rem 0.75rem',
-                                                                    borderRadius: '50px',
-                                                                    fontSize: '0.85rem',
-                                                                    background: (app.amountPaid >= 155 || app.paymentStatus === 'Paid') ? '#dcfce7' : '#fee2e2',
-                                                                    color: (app.amountPaid >= 155 || app.paymentStatus === 'Paid') ? '#166534' : '#991b1b',
-                                                                    fontWeight: 'bold'
-                                                                }}>
-                                                                    {(app.amountPaid >= 155 || app.paymentStatus === 'Paid') ? 'Paid' : 'Pending'}
-                                                                </span>
-                                                            </td>
-                                                            <td style={{ padding: '1rem', textAlign: 'right' }}>GHS 155.00</td>
-                                                            <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
-                                                                GHS {(app.amountPaid || 0).toFixed(2)}
-                                                            </td>
-                                                            <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>
-                                                                GHS {(parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? 155 : 0)).toFixed(2)}
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                    myApps.map(app => {
+                                                        const fee = FEES[app.professionalCategory] || 150;
+                                                        const currentBalance = parseFloat(app.balanceDue) || (app.paymentStatus === 'Pending' ? fee : 0);
+                                                        const isPaid = (app.amountPaid >= fee || app.paymentStatus === 'Paid');
+
+                                                        return (
+                                                            <tr key={app.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                <td style={{ padding: '1rem' }}>{new Date(app.date).toLocaleDateString()}</td>
+                                                                <td style={{ padding: '1rem' }}>{app.type} Visit</td>
+                                                                <td style={{ padding: '1rem' }}>{app.professionalName}</td>
+                                                                <td style={{ padding: '1rem' }}>
+                                                                    <span style={{
+                                                                        padding: '0.25rem 0.75rem',
+                                                                        borderRadius: '50px',
+                                                                        fontSize: '0.85rem',
+                                                                        background: isPaid ? '#dcfce7' : '#fee2e2',
+                                                                        color: isPaid ? '#166534' : '#991b1b',
+                                                                        fontWeight: 'bold'
+                                                                    }}>
+                                                                        {isPaid ? 'Paid' : 'Pending'}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '1rem', textAlign: 'right' }}>GHS {fee.toFixed(2)}</td>
+                                                                <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
+                                                                    GHS {(app.amountPaid || 0).toFixed(2)}
+                                                                </td>
+                                                                <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 'bold', color: '#dc2626' }}>
+                                                                    GHS {currentBalance.toFixed(2)}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
                                                 )}
                                             </tbody>
                                         </table>
@@ -1755,13 +2161,16 @@ export default function PatientDashboard({ user }) {
                     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '2rem' }}>
                         <div className="card" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                                <div>
-                                    <h3 style={{ margin: 0 }}>
-                                        {previewFile.professionalRole === 'DOCTOR' ? '🩺 Digital Clinical Record' : (previewFile.professionalRole === 'NURSE' ? '📋 Nursing Information' : '🔬 Laboratory Analysis Report')}
-                                    </h3>
-                                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
-                                        {previewFile.structuredResults?.testName || previewFile.fileName} | Date: {previewFile.date}
-                                    </p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '45px' }} />
+                                    <div>
+                                        <h3 style={{ margin: 0 }}>
+                                            {previewFile.professionalRole === 'DOCTOR' ? '🩺 Digital Clinical Record' : (previewFile.professionalRole === 'NURSE' ? '📋 Nursing Information' : '🔬 Laboratory Analysis Report')}
+                                        </h3>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
+                                            {previewFile.structuredResults?.testName || previewFile.fileName} | Date: {previewFile.date}
+                                        </p>
+                                    </div>
                                 </div>
                                 <button onClick={() => setPreviewFile(null)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>Close</button>
                             </div>

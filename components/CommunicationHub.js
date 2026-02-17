@@ -2,18 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import Card from './ui/Card';
 import Button from './ui/Button';
-import Input from './ui/Input';
+// import Input from './ui/Input'; // Unused
 import PatientAutofillInputs from './ui/PatientAutofillInputs';
-import WhatsAppButton from './WhatsAppButton';
+// import WhatsAppButton from './WhatsAppButton'; // Unused
 import DictationRecorder from './DictationRecorder';
 import VideoConsultation from './VideoConsultation';
+import { getSocket } from '@/lib/socket';
 
 export default function CommunicationHub({
     user,
     patients = [], // List of patients for autofill/lookup
     staff = [],    // List of staff/professionals
     initialPatientId = null, // Optional initial patient
-    onPatientSelect // Optional callback when patient changes
+    // onPatientSelect // Unused
 }) {
     const [targetType, setTargetType] = useState('patient'); // 'patient' or 'staff'
     const [selectedTargetId, setSelectedTargetId] = useState(initialPatientId);
@@ -50,10 +51,8 @@ export default function CommunicationHub({
         }
         setLoadingMessages(true);
         try {
-            // API currently optimized for patient-user messages. 
-            // For staff-staff, we might need a different query or the same if backend supports generic 'recipientId'.
-            // Assuming /api/messages supports generic recipientId for now, or just fetches based on ID.
-            const res = await fetch(`/api/messages?patientId=${selectedTargetId}&userId=${user.id}`);
+            // Use 'direct=true' for strict P2P isolation
+            const res = await fetch(`/api/messages?patientId=${selectedTargetId}&direct=true`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
@@ -77,6 +76,18 @@ export default function CommunicationHub({
         } else {
             setMessages([]);
         }
+
+        // Socket listener for real-time updates in the active conversation
+        const socket = getSocket();
+        if (socket) {
+            const handleMessage = (data) => {
+                if (data.senderId === selectedTargetId || data.recipientId === selectedTargetId) {
+                    fetchMessages();
+                }
+            };
+            socket.on('receive_message', handleMessage);
+            return () => socket.off('receive_message', handleMessage);
+        }
     }, [selectedTargetId]);
 
     const handleSendMessage = async () => {
@@ -97,13 +108,29 @@ export default function CommunicationHub({
                     recipientPhone: selectedTarget.phoneNumber,
                     recipientEmail: selectedTarget.email,
                     content,
-                    type
+                    type,
+                    senderId: user.id,
+                    senderName: user.name,
+                    role: user.role
                 })
             });
             const data = await res.json();
             if (data.success) {
                 alert(`Message sent via ${type}!`);
                 document.getElementById('comm-hub-msg-content').value = '';
+
+                // Emit Real-time Socket Notification
+                const socket = getSocket();
+                if (socket) {
+                    socket.emit('send_message', {
+                        recipientId: selectedTarget.id,
+                        senderId: user.id,
+                        senderName: user.name,
+                        content,
+                        type
+                    });
+                }
+
                 fetchMessages();
             } else {
                 alert('Failed: ' + data.error);
@@ -111,6 +138,21 @@ export default function CommunicationHub({
         } catch (e) {
             console.error(e);
             alert('Error sending message');
+        }
+    };
+
+    const handleDeleteMessage = async (id) => {
+        if (!confirm('Are you sure you want to delete this message?')) return;
+        try {
+            const res = await fetch(`/api/messages?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages(prev => prev.filter(m => m.id !== id));
+            } else {
+                alert('Failed to delete message');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error deleting message');
         }
     };
 
@@ -180,7 +222,7 @@ export default function CommunicationHub({
                                     if (!selectedTarget) return;
                                     const number = selectedTarget.whatsappNumber || selectedTarget.phoneNumber;
                                     const cleanNumber = number.replace(/\D/g, '');
-                                    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Hello ${selectedTarget.name}, this is ${user.name} from Dr. Kal's Virtual Hospital.`)}`, '_blank');
+                                    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Hello ${selectedTarget.name}, this is ${user.name} from CareOnClick.`)}`, '_blank');
                                 }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📱</div>
@@ -201,7 +243,19 @@ export default function CommunicationHub({
                             {/* Telehealth Room */}
                             <Card
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #a855f7', background: '#f3e8ff', transition: 'transform 0.2s' }}
-                                onClick={() => selectedTarget && setShowVideoConsultation(true)}
+                                onClick={() => {
+                                    if (!selectedTarget) return;
+                                    const socket = getSocket();
+                                    if (socket) {
+                                        socket.emit('call-invite', {
+                                            to: selectedTarget.id,
+                                            from: user.id,
+                                            name: user.name,
+                                            roomId: user.id // Using sender's ID as Room ID for simplicity
+                                        });
+                                    }
+                                    setShowVideoConsultation(true);
+                                }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>🩺</div>
                                 <div style={{ fontWeight: 'bold', color: '#7e22ce' }}>Telehealth Video Room</div>
@@ -211,7 +265,19 @@ export default function CommunicationHub({
                             {/* Video Call */}
                             <Card
                                 style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #f59e0b', background: '#fffbeb', transition: 'transform 0.2s' }}
-                                onClick={() => selectedTarget && setShowVideoConsultation(true)}
+                                onClick={() => {
+                                    if (!selectedTarget) return;
+                                    const socket = getSocket();
+                                    if (socket) {
+                                        socket.emit('call-invite', {
+                                            to: selectedTarget.id,
+                                            from: user.id,
+                                            name: user.name,
+                                            roomId: user.id
+                                        });
+                                    }
+                                    setShowVideoConsultation(true);
+                                }}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📹</div>
                                 <div style={{ fontWeight: 'bold', color: '#b45309' }}>Quick Video Call</div>
@@ -279,9 +345,19 @@ export default function CommunicationHub({
                                         border: msg.senderId === user.id ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
                                         alignSelf: msg.senderId === user.id ? 'flex-end' : 'flex-start',
                                         maxWidth: '90%',
-                                        marginLeft: msg.senderId === user.id ? 'auto' : '0'
+                                        marginLeft: msg.senderId === user.id ? 'auto' : '0',
+                                        position: 'relative'
                                     }}>
-                                        <div style={{ fontSize: '0.9rem' }}>{msg.content}</div>
+                                        {msg.senderId === user.id && (
+                                            <button
+                                                onClick={() => handleDeleteMessage(msg.id)}
+                                                style={{ position: 'absolute', top: '5px', right: '5px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', opacity: 0.5 }}
+                                                title="Delete message"
+                                            >
+                                                🗑️
+                                            </button>
+                                        )}
+                                        <div style={{ fontSize: '0.9rem', paddingRight: msg.senderId === user.id ? '20px' : '0' }}>{msg.content}</div>
                                         <div style={{ fontSize: '0.7rem', color: '#666', marginTop: '0.4rem', textAlign: 'right' }}>
                                             {msg.type} • {new Date(msg.timestamp).toLocaleString()}
                                         </div>
@@ -290,6 +366,20 @@ export default function CommunicationHub({
                             )}
                         </div>
                     </Card>
+                </div>
+            )}
+            {showVideoConsultation && selectedTarget && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999 }}>
+                    <VideoConsultation
+                        roomId={user.id}
+                        user={user}
+                    />
+                    <button
+                        onClick={() => setShowVideoConsultation(false)}
+                        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000, padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                    >
+                        Close Video
+                    </button>
                 </div>
             )}
         </Card>

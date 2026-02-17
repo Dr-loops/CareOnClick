@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
+import bcrypt from 'bcryptjs';
 
 export async function PATCH(request) {
     try {
@@ -13,30 +14,50 @@ export async function PATCH(request) {
         console.log("DEBUG: Received Profile Update Payload. Size:", JSON.stringify(data).length);
 
         // Fields allowed to be updated
-        const { name, phoneNumber, whatsappNumber, bio, avatarUrl, licenseNumber, yearsOfExperience, currentFacility, country, region, specialization } = data;
+        const { name, phoneNumber, whatsappNumber, bio, avatarUrl, licenseNumber, yearsOfExperience, currentFacility, country, region, specialization, password } = data;
+
+        const updateData = {
+            name,
+            phoneNumber,
+            whatsappNumber,
+            bio,
+            avatarUrl,
+            licenseNumber,
+            yearsOfExperience: (yearsOfExperience !== '' && yearsOfExperience !== null && yearsOfExperience !== undefined) ? parseInt(yearsOfExperience) : undefined,
+            currentFacility,
+            country,
+            region,
+            specialization
+        };
+
+        // If password is provided, hash it
+        if (password) {
+            updateData.password = await bcrypt.hash(password, 10);
+        }
+
+        // Optional: Check if user exists first to provide better error
+        const existingUser = await prisma.user.findUnique({
+            where: { id: session.user.id }
+        });
+        if (!existingUser) {
+            return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+        }
 
         const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
-            data: {
-                name,
-                phoneNumber,
-                whatsappNumber,
-                bio,
-                avatarUrl,
-                licenseNumber,
-                yearsOfExperience: (yearsOfExperience !== '' && yearsOfExperience !== null && yearsOfExperience !== undefined) ? parseInt(yearsOfExperience) : undefined,
-                currentFacility,
-                country,
-                currentFacility,
-                country,
-                region,
-                specialization
-            }
+            data: updateData
         });
 
         return NextResponse.json(updatedUser);
     } catch (error) {
         console.error("DEBUG: Profile Update Error:", error);
-        return NextResponse.json({ error: error.message || 'Failed to update profile' }, { status: 500 });
+        // Handle large payload explicitly if detectable, or Prisma errors
+        if (error.code === 'P2002') {
+            return NextResponse.json({ error: 'Database constraint violation (duplicate field)' }, { status: 400 });
+        }
+        return NextResponse.json({
+            error: error.message || 'Failed to update profile',
+            details: error.stack?.split('\n')[0]
+        }, { status: 500 });
     }
 }

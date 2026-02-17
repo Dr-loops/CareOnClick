@@ -6,7 +6,7 @@ interface Patient {
     id: string;
     name: string;
     // Add other properties as needed based on API response
-    [key: string]: any;
+    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 interface Vital {
@@ -21,7 +21,7 @@ interface Vital {
     heartRate?: number; // Legacy/Alt
     temperature?: number; // Legacy/Alt
     recordedAt: string;
-    [key: string]: any;
+    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 interface Task {
@@ -29,7 +29,7 @@ interface Task {
     description: string;
     status: string;
     priority: string;
-    [key: string]: any;
+    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 import { assessPatientRisk } from '@/lib/ai_logic';
@@ -42,7 +42,7 @@ export function usePatients(query = '') {
     );
 
     // Smart Enriched Data: Calculate Triage Score for each patient
-    const enrichedPatients = Array.isArray(data) ? data.map((patient: any) => {
+    const enrichedPatients = Array.isArray(data) ? data.map((patient: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         // Map API's latestVital to flattened 'vitals' object consistent with interface
         const vitals = patient.latestVital || patient.vitals || {};
         const triage = assessPatientRisk(vitals);

@@ -20,7 +20,7 @@ export async function GET(request) {
         const vitals = await prisma.medicalRecord.findMany({
             where: {
                 patientId: patientId,
-                unit: 'VITALS'
+                unit: { in: ['VITALS', 'Vitals'] }
             },
             orderBy: { createdAt: 'desc' },
             take: 20

@@ -13,10 +13,11 @@ import { ROLES } from '@/lib/auth_constants';
 import { LAB_TESTS } from '@/lib/lab_tests_data';
 import { CLINICAL_MODULES } from '@/lib/clinical_data';
 import { PHYSICIAN_TABS, AI_SUGGESTIONS, CLINICAL_ALERTS } from '@/lib/physician_data';
-import { saveGlobalRecord, updateAppointment, getGlobalData, performTriage, updatePatientVitals, KEYS } from '@/lib/global_sync';
+import { saveGlobalRecord, updateAppointment, getGlobalData, performTriage, updatePatientVitals, logAudit, KEYS } from '@/lib/global_sync';
 import { analyzeResult, REFERENCE_RANGES } from '@/lib/medical_analysis';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
 import { usePatients, useVitals, useTasks } from '@/lib/hooks/useClinicalData';
+import { useStaff } from '@/lib/hooks/useStaff';
 import NurseDashboard from './NurseDashboard';
 import PharmacyDashboard from './PharmacyDashboard';
 import DieticianDashboard from './DieticianDashboard';
@@ -39,101 +40,217 @@ import WhatsAppButton from './WhatsAppButton';
 import ProfileModal from './ProfileModal';
 import VideoConsultation from './VideoConsultation';
 import CommunicationHub from './CommunicationHub';
+import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW]
 
+const AlertsView = ({ professionalName, role, professionalId, apiAppointments = [], onRefresh, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loadingMessages, setLoadingMessages] = useState(false);
 
-const AlertsView = ({ professionalName, role, professionalId }) => {
+    // 1. Pending Appointments (Source of Truth: API)
+    const pendingAppointments = apiAppointments.filter(a =>
+        a.status === 'Pending' &&
+        (a.professionalId === professionalId || role === 'Admin' || (role === 'Scientist' && a.category === 'Scientist'))
+    );
+
+    // 2. Other Notifications (Local/Global Sync)
     const notifications = getGlobalData(KEYS.NOTIFICATIONS, []);
     const myNotifications = notifications.filter(n =>
         (n.professionalName === professionalName || n.recipientId === role || n.recipientId === professionalId || n.recipientId === 'STAFF') &&
         n.status !== 'Dismissed'
     );
 
-    const handleAction = (id, action) => {
+    const fetchMessages = async () => {
+        setLoadingMessages(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                const incoming = data.filter(m => m.recipientId === professionalId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Message error", e);
+        } finally {
+            setLoadingMessages(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = getSocket();
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+                if (onRefresh) onRefresh();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+            socket.on('appointment_change', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+                socket.off('appointment_change', handleUpdate);
+            };
+        }
+    }, [professionalId, onRefresh]);
+
+    const handleAppointmentAction = async (id, action) => {
+        const newStatus = action === 'Accept' ? 'Upcoming' : 'Cancelled';
+        const confirmMsg = action === 'Accept' ? 'Accept this appointment?' : 'Reject this appointment?';
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await fetch('/api/appointments', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, status: newStatus })
+            });
+
+            if (res.ok) {
+                alert(`Appointment ${action}ed successfully.`);
+
+                const app = apiAppointments.find(a => a.id === id);
+                const socket = getSocket();
+                if (socket && app) {
+                    socket.emit('send_notification', {
+                        recipientId: app.patientId,
+                        type: action === 'Accept' ? 'APPOINTMENT_CONFIRMED' : 'APPOINTMENT_CANCELLED',
+                        title: action === 'Accept' ? 'Appointment Accepted' : 'Appointment Cancelled',
+                        message: action === 'Accept'
+                            ? `Your appointment with ${professionalName} on ${app.date} has been accepted.`
+                            : `Your appointment with ${professionalName} has been cancelled.`,
+                    });
+                }
+
+                logAudit({
+                    actorName: professionalName || 'Professional',
+                    action: `${action.toUpperCase()}ED APPOINTMENT`,
+                    targetName: `Appointment ${id}`,
+                    details: `${action}ed request. Status: ${newStatus}`,
+                    notes: `Appointment ID: ${id}`
+                });
+
+                if (onRefresh) onRefresh();
+            } else {
+                alert('Failed to update status.');
+            }
+        } catch (e) {
+            console.error("Error updating appointment", e);
+            alert('An error occurred.');
+        }
+    };
+
+    const handleNotificationAction = (id, action) => {
         if (action === 'Dismiss') {
             updateNotificationStatus(id, { status: 'Dismissed' });
-        } else if (action === 'Accept') {
-            const notif = notifications.find(n => n.id === id);
-            updateNotificationStatus(id, { status: 'Accepted' });
-
-            // Log confirmation activity
-            if (notif && notif.details?.appointmentId) {
-                // Trigger "In Progress"
-                updateAppointmentStatus(notif.details.appointmentId, { status: 'In Progress' });
-            }
-            alert('Appointment Accepted! Status set to In Progress. Patient will be notified.');
         } else if (action === 'Snooze') {
             updateNotificationStatus(id, { status: 'Snoozed' });
         }
     };
 
+    const generalAlerts = [
+        ...myNotifications.map(n => ({ ...n, alertType: 'NOTIFICATION' })),
+        ...messages.map(m => ({
+            id: m.id,
+            title: `Message from ${m.senderName}`,
+            message: m.content,
+            timestamp: m.timestamp,
+            status: 'Unread',
+            type: 'CHAT',
+            senderId: m.senderId,
+            alertType: 'MESSAGE'
+        }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
     return (
-        <Card title="Recent Alerts & Notifications 🔔">
-            <p style={{ color: 'var(--color-grey-500)', marginBottom: '1.5rem' }}>Stay updated with patient bookings and payment confirmations.</p>
+        <Card title={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span>Recent Alerts & Messages 🔔</span>
+                <Button variant="secondary" size="sm" onClick={fetchMessages} disabled={loadingMessages}>
+                    {loadingMessages ? '...' : '↻ Refresh'}
+                </Button>
+            </div>
+        }>
+            <p style={{ color: 'var(--color-grey-500)', marginBottom: '1.5rem' }}>
+                Manage pending appointments, system alerts, and staff messages.
+            </p>
 
             <div className="alerts-container">
-                {myNotifications.length === 0 ? (
+                {pendingAppointments.length === 0 && generalAlerts.length === 0 ? (
                     <div className="alert-empty-state">
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                         <h4>No new alerts</h4>
-                        <p style={{ color: 'var(--color-grey-500)' }}>Check back later for new patient activities.</p>
+                        <p style={{ color: 'var(--color-grey-500)' }}>You're all caught up!</p>
                     </div>
                 ) : (
-                    myNotifications.map(notif => (
-                        <Card key={notif.id} className="alert-card" style={{
-                            borderColor: notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981',
-                            background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
-                        }}>
-                            <div className="alert-header">
-                                <div>
-                                    <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{notif.title}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
-                                </div>
-                                <Badge variant={notif.status === 'Accepted' ? 'success' : 'neutral'}>
-                                    {notif.status}
-                                </Badge>
+                    <>
+                        {/* Pending Requests Section */}
+                        {pendingAppointments.length > 0 && (
+                            <div style={{ marginBottom: '2rem' }}>
+                                <h4 style={{ color: '#d97706', borderBottom: '2px solid #fcd34d', paddingBottom: '0.5rem' }}>⏳ Pending Requests ({pendingAppointments.length})</h4>
+                                {pendingAppointments.map(app => (
+                                    <Card key={app.id} className="alert-card" style={{
+                                        borderColor: '#f59e0b',
+                                        background: '#fffbeb',
+                                        marginTop: '1rem'
+                                    }}>
+                                        <div className="alert-header">
+                                            <div>
+                                                <h4 style={{ margin: 0, color: '#92400e' }}>New Appointment Request</h4>
+                                                <p style={{ fontSize: '0.8rem', color: '#b45309', margin: '0.2rem 0' }}>Received: {new Date(app.createdAt || Date.now()).toLocaleString()}</p>
+                                            </div>
+                                            <Badge variant="warning">Action Required</Badge>
+                                        </div>
+                                        <div className="alert-details" style={{ margin: '1rem 0' }}>
+                                            <div><strong>Patient:</strong> {app.patientName}</div>
+                                            <div><strong>Type:</strong> {app.type} Consultation</div>
+                                            <div><strong>Requested Time:</strong> {app.date} at {app.time}</div>
+                                            <div><strong>Payment:</strong> {app.paymentStatus} (GHS {app.amountPaid})</div>
+                                        </div>
+                                        <div className="alert-actions">
+                                            <Button onClick={() => handleAppointmentAction(app.id, 'Accept')} variant="primary" size="sm">✅ Accept</Button>
+                                            <Button onClick={() => handleAppointmentAction(app.id, 'Reject')} variant="danger" size="sm">❌ Reject</Button>
+                                        </div>
+                                    </Card>
+                                ))}
                             </div>
-                            <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                        )}
 
-                            {notif.details && (
-                                <div className="alert-details">
-                                    {notif.type === 'APPOINTMENT_BOOKING' ? (
+                        {/* Merged Notifications & Messages Section */}
+                        {generalAlerts.map(alertItem => (
+                            <Card key={alertItem.id} className="alert-card" style={{
+                                borderColor: alertItem.alertType === 'MESSAGE' ? '#8b5cf6' : (alertItem.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981'),
+                                background: alertItem.status === 'Unread' ? '#f0f9ff' : 'white',
+                                opacity: 1,
+                                marginBottom: '1rem'
+                            }}>
+                                <div className="alert-header">
+                                    <div>
+                                        <h4 style={{ margin: 0, color: 'var(--color-grey-900)' }}>{alertItem.title}</h4>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--color-grey-500)', margin: '0.2rem 0' }}>{new Date(alertItem.timestamp).toLocaleString()}</p>
+                                    </div>
+                                    <Badge variant={alertItem.alertType === 'MESSAGE' ? 'secondary' : 'neutral'}>{alertItem.status}</Badge>
+                                </div>
+                                <p style={{ margin: '0 0 1rem 0' }}>{alertItem.message}</p>
+                                <div className="alert-actions">
+                                    {alertItem.alertType === 'NOTIFICATION' ? (
                                         <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Type:</strong> {notif.details.appointmentType}</div>
-                                            <div><strong>Date:</strong> {notif.details.date} at {notif.details.time}</div>
-                                            <div><strong>Reason:</strong> {notif.details.reason}</div>
-                                            {notif.details.balanceDue > 0 ? (
-                                                <div style={{ marginTop: '0.5rem', color: 'var(--color-error)', fontWeight: 'bold' }}>
-                                                    ⚠️ Part Payment: GHS {notif.details.amountPaid} (Bal: {notif.details.balanceDue})
-                                                </div>
-                                            ) : notif.details.amountPaid ? (
-                                                <div style={{ marginTop: '0.5rem', color: 'var(--color-success)', fontWeight: 'bold' }}>
-                                                    ✅ Full Payment: GHS {notif.details.amountPaid}
-                                                </div>
-                                            ) : null}
+                                            <Button onClick={() => handleNotificationAction(alertItem.id, 'Dismiss')} variant="secondary" size="sm">Dismiss</Button>
+                                            <Button onClick={() => handleNotificationAction(alertItem.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
                                         </>
                                     ) : (
                                         <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Amount:</strong> {notif.details.amount}</div>
-                                            <div><strong>Status:</strong> <Badge variant="success">Confirmed</Badge></div>
+                                            <Button onClick={() => onReply(alertItem.senderId)} variant="primary" size="sm">💬 Reply</Button>
+                                            <Button variant="secondary" size="sm">Archive</Button>
                                         </>
                                     )}
                                 </div>
-                            )}
-
-                            <div className="alert-actions">
-                                {notif.type === 'APPOINTMENT_BOOKING' && notif.status !== 'Accepted' && (
-                                    <>
-                                        <Button onClick={() => handleAction(notif.id, 'Accept')} variant="primary" size="sm">Accept</Button>
-                                        <Button onClick={() => alert('Feature coming soon: Suggesting alternative time.')} variant="secondary" size="sm">Suggest Alt Time</Button>
-                                    </>
-                                )}
-                                <Button onClick={() => handleAction(notif.id, 'Snooze')} variant="secondary" size="sm">Snooze</Button>
-                                <Button onClick={() => handleAction(notif.id, 'Dismiss')} variant="danger" size="sm">Dismiss</Button>
-                            </div>
-                        </Card>
-                    ))
+                            </Card>
+                        ))}
+                    </>
                 )}
             </div>
         </Card>
@@ -141,8 +258,12 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
 };
 
 export default function ProfessionalDashboard({ user }) {
-    const router = useRouter();
+    // const router = useRouter(); // Unused
     useGlobalSync(); // Trigger re-render on any global change
+
+    // [FIX] Restore missing data hooks
+    const { staff } = useStaff();
+    const { vitals: recentVitals } = useVitals();
 
     // [NEW] State for Video Consultation
     const [showVideoConsultation, setShowVideoConsultation] = useState(false);
@@ -155,19 +276,38 @@ export default function ProfessionalDashboard({ user }) {
 
             socket.on('appointment_change', () => {
                 // Refresh data
-                // In a real app we would refetch, but here we trigger sync tick or rely on optimistic updates
-                // dispatchSync() is available via import but we need to use it.
-                // Wait, useGlobalSync returns 'syncTick' but doesn't expose dispatchSync?
-                // The global_sync module exports dispatchSync? No, it exports internal dispatch logic?
-                // Actually `useGlobalSync` just listens.
-                // We need to trigger a re-eval or re-fetch.
-                // We can force a re-render or re-fetch apiPatients.
+                const fetchApiData = async () => {
+                    try {
+                        const resApps = await fetch('/api/appointments');
+                        if (resApps.ok) {
+                            setApiAppointments(await resApps.json());
+                        }
+                    } catch (e) {
+                        console.error("Failed to refresh dashboard data", e);
+                    }
+                };
+                fetchApiData();
             });
-            socket.on('receive_message', () => { }); // Handle messages
+
+            socket.on('receive_message', (data) => {
+                setToast({ message: `New message from ${data.senderName || 'Patient'}`, type: 'info' });
+            });
+
+            // [NEW] Handle Real-time Notifications
+            socket.on('notification', (data) => {
+                setToast({ message: data.message || 'New Notification', type: 'info' });
+                // Play sound?
+                const audio = new Audio('/notification.mp3').catch(() => { }); // distinct sound if available
+                if (data.appointment) {
+                    // Update list immediately
+                    setApiAppointments(prev => [data.appointment, ...prev]);
+                }
+            });
 
             return () => {
                 socket.off('appointment_change');
                 socket.off('receive_message');
+                socket.off('notification');
             };
         }
     }, [user]);
@@ -188,6 +328,8 @@ export default function ProfessionalDashboard({ user }) {
     const [manualEntry, setManualEntry] = useState({
         testName: '', resultValue: '', unit: '', normalRange: '', flag: '', notes: ''
     });
+    const [labComments, setLabComments] = useState(''); // [NEW] For validation comments
+
 
 
 
@@ -216,20 +358,20 @@ export default function ProfessionalDashboard({ user }) {
     const [toast, setToast] = useState(null);
 
     // [NEW] Fetch Appointments from API
-    useEffect(() => {
-        const fetchApiData = async () => {
-            try {
-                // Fetch all appointments (filtered by professionalId server-side ideally, but for now we fetch all and filter locally for scientist if needed, or api returns all for professionals)
-                const resApps = await fetch('/api/appointments');
-                if (resApps.ok) {
-                    const data = await resApps.json();
-                    setApiAppointments(data);
-                }
-            } catch (e) {
-                console.error("Failed to fetch dashboard data", e);
+    const fetchApiData = async () => {
+        try {
+            // Fetch all appointments
+            const resApps = await fetch('/api/appointments');
+            if (resApps.ok) {
+                const data = await resApps.json();
+                setApiAppointments(data);
             }
-        };
+        } catch (e) {
+            console.error("Failed to fetch dashboard data", e);
+        }
+    };
 
+    useEffect(() => {
         fetchApiData();
     }, [user, user?.role]); // Re-fetch if user changes
     const [messages, setMessages] = useState([]);
@@ -260,6 +402,46 @@ export default function ProfessionalDashboard({ user }) {
             fetchTasks();
         }
     }, [activeLabTab, user.id]);
+
+
+    // [NEW] Lab Draft Management
+    useEffect(() => {
+        if (selectedPatientId && activeTest) {
+            const draftKey = `lab_draft_${selectedPatientId}_${activeTest}`;
+            const savedDraft = localStorage.getItem(draftKey);
+            if (savedDraft) {
+                try {
+                    const { results, comments } = JSON.parse(savedDraft);
+                    setTestResults(results || {});
+                    setLabComments(comments || '');
+                } catch (e) { console.error("Draft load error", e); }
+            } else {
+                // Clear if no draft
+                const defaults = {};
+                const testSource = isScientist ? LAB_TESTS[activeLabTab] : CLINICAL_MODULES[user.role];
+                const currentTestData = testSource?.find(t => t.id === activeTest);
+                currentTestData?.parameters.forEach(p => defaults[p.id] = p.default || '');
+                setTestResults(defaults);
+                setLabComments('');
+            }
+        }
+    }, [selectedPatientId, activeTest]);
+
+    const saveDraft = () => {
+        if (!selectedPatientId || !activeTest) return;
+        const draftKey = `lab_draft_${selectedPatientId}_${activeTest}`;
+        localStorage.setItem(draftKey, JSON.stringify({
+            results: testResults,
+            comments: labComments
+        }));
+        setToast({ message: 'Draft saved successfully!', type: 'success' });
+    };
+
+    const clearDraft = (patientId, testId) => {
+        const draftKey = `lab_draft_${patientId}_${testId}`;
+        localStorage.removeItem(draftKey);
+    };
+
 
     const handleCreateTask = async (e) => {
         e.preventDefault();
@@ -305,10 +487,20 @@ export default function ProfessionalDashboard({ user }) {
     };
 
     // [NEW] Profile Modal State
-    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-    // [NEW] Profile Update Handler
-    // [NEW] Local User State for Immediate Feedback
+    // State for Billing Invoice
+    const [invoiceData, setInvoiceData] = useState(null); // { patient: {}, isOpen: true/false }
+    const [userProfile, setUserProfile] = useState(user); // Local user state for immediate updates
+
+    useEffect(() => {
+        if (staff && staff.length > 0) {
+            const me = staff.find(s => s.id === user.id);
+            if (me) {
+                setUserProfile(prev => ({ ...prev, ...me }));
+            }
+        }
+    }, [staff, user.id]);
     const [currentUser, setCurrentUser] = useState(user);
 
     // Sync if server user updates (e.g. reload or re-auth)
@@ -372,6 +564,15 @@ export default function ProfessionalDashboard({ user }) {
         if (selectedPatient) {
             setMedicationList(selectedPatient.meds || []);
             fetchPatientRecords();
+
+            // [NEW] Audit Log
+            logAudit({
+                actorName: user.name || 'Professional',
+                action: 'VIEWED PATIENT DASHBOARD',
+                targetName: selectedPatient.name,
+                details: `Viewed records for ${selectedPatient.name}`,
+                notes: `Patient ID: ${selectedPatient.id}`
+            });
         }
     }, [selectedPatientId]);
 
@@ -411,10 +612,10 @@ export default function ProfessionalDashboard({ user }) {
 
     const fileInputRef = useRef(null);
 
-    if (isNurse) return <NurseDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isPharmacist) return <PharmacyDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isDietician) return <DieticianDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
-    if (isPsychologist) return <PsychologistDashboard user={user} onAvatarClick={() => setShowProfileModal(true)} />;
+    if (isNurse) return <NurseDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isPharmacist) return <PharmacyDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isDietician) return <DieticianDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
+    if (isPsychologist) return <PsychologistDashboard user={user} onAvatarClick={() => setIsProfileOpen(true)} />;
 
     // ... (rest of filtering) ...
 
@@ -524,7 +725,8 @@ export default function ProfessionalDashboard({ user }) {
                 structuredResults: activeTest ? {
                     testId: activeTest,
                     testName: activeTestData?.name,
-                    results: testResults
+                    results: testResults,
+                    comments: labComments
                 } : null,
                 scientist: user.name,
                 professionalRole: user.role
@@ -532,6 +734,15 @@ export default function ProfessionalDashboard({ user }) {
 
             try {
                 await saveGlobalRecord(newRecord);
+
+                // [NEW] Audit Log (Explicit)
+                logAudit({
+                    actorName: user.name || 'Professional',
+                    action: 'DISPATCHED RECORD',
+                    targetName: newRecord.fileName,
+                    details: `Dispatched ${activeTest ? 'structured' : 'file'} result for ${newRecord.pathNumber}`,
+                    notes: `Record Type: ${newRecord.unit}`
+                });
 
                 // [NEW] Attempt to mark active appointment as 'Services Rendered'
                 // We find the most recent 'In Progress' or 'Upcoming' appointment for this patient/prof
@@ -554,9 +765,13 @@ export default function ProfessionalDashboard({ user }) {
 
                 alert(`Result successfully DISPATCHED to Patient ${pathSearch}!`);
 
+                // CLEANUP
+                clearDraft(selectedPatient.id, activeTest); // Clear draft on success
+
                 // RESET
                 setActiveTest(null);
                 setTestResults({});
+                setLabComments('');
                 setLastUploaded(null);
             } catch (err) {
                 alert(`Dispatch FAILED: ${err.message}. Please check the Path Number.`);
@@ -621,17 +836,29 @@ export default function ProfessionalDashboard({ user }) {
         <DashboardLayout
             role={currentUser.role}
             userName={currentUser.name}
-            avatarUrl={currentUser.avatarUrl} // [NEW]
+            avatarUrl={currentUser.avatarUrl || currentUser.image} // [FIX] Support both field names
             sidebarItems={sidebarItems}
             activeTab={activeLabTab}
             onTabChange={setActiveLabTab}
-            onAvatarClick={() => setShowProfileModal(true)}
+            onAvatarClick={() => setIsProfileOpen(true)}
         >
-            {showProfileModal && (
+            {/* Profile Modal */}
+            {isProfileOpen && (
                 <ProfileModal
-                    user={currentUser}
-                    onClose={() => setShowProfileModal(false)}
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
                     onSave={handleProfileUpdate}
+                />
+            )}
+
+            {/* Billing Invoice Modal */}
+            {invoiceData && (
+                <BillingInvoiceModal
+                    isOpen={invoiceData.isOpen}
+                    onClose={() => setInvoiceData(null)}
+                    patient={invoiceData.patient}
+                    professionalName={user.name}
+                    professionalRole={user.role}
                 />
             )}
 
@@ -663,8 +890,8 @@ export default function ProfessionalDashboard({ user }) {
 
             {/* Print Header */}
             <div className="print-only" style={{ textAlign: 'center', marginBottom: '2rem', borderBottom: '2px solid #000', paddingBottom: '1rem' }}>
-                <img src="/logo.png" alt="Dr Kal Logo" style={{ height: '80px', marginBottom: '1rem' }} />
-                <h1 style={{ margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '80px', marginBottom: '1rem' }} />
+                <h1 style={{ margin: 0 }}>CAREONCLICK</h1>
                 <h2 style={{ margin: '0.5rem 0' }}>OFFICIAL LABORATORY REPORT</h2>
                 <p style={{ fontSize: '0.9rem' }}>Date: {new Date().toLocaleDateString()} | Time: {new Date().toLocaleTimeString()}</p>
             </div>
@@ -739,7 +966,7 @@ export default function ProfessionalDashboard({ user }) {
                                                             )}
                                                             {patient.whatsappNumber && (
                                                                 <div onClick={(e) => e.stopPropagation()}>
-                                                                    <WhatsAppButton phoneNumber={patient.whatsappNumber} label="WhatsApp" message={`Hello ${patient.name}, this is Dr. Kal's office.`} />
+                                                                    <WhatsAppButton phoneNumber={patient.whatsappNumber} label="WhatsApp" message={`Hello ${patient.name}, this is CareOnClick office.`} />
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1238,14 +1465,18 @@ export default function ProfessionalDashboard({ user }) {
                         )}
 
                         {/* Communication Hub Tab - Doctor View */}
-                        {/* Communication Hub Tab - Doctor View */}
                         {activeLabTab === 'communication' && (
-                            <CommunicationHub
-                                user={user}
-                                patients={patients}
-                                initialPatientId={selectedPatientId}
-                                onPatientSelect={(p) => setSelectedPatientId(p.id)}
-                            />
+                            selectedPatientId ? (
+                                <CollaborationTab user={user} selectedPatientId={selectedPatientId} />
+                            ) : (
+                                <CommunicationHub
+                                    user={user}
+                                    patients={patients}
+                                    staff={staff}
+                                    initialPatientId={selectedPatientId}
+                                    onPatientSelect={(p) => setSelectedPatientId(p.id)}
+                                />
+                            )
                         )}
 
                         {/* Engagement Tab */}
@@ -1432,7 +1663,17 @@ export default function ProfessionalDashboard({ user }) {
                         {/* Alerts Tab */}
                         {
                             activeLabTab === 'alerts' && (
-                                <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                                <AlertsView
+                                    professionalName={user.name}
+                                    role={user.role}
+                                    professionalId={user.id}
+                                    apiAppointments={apiAppointments}
+                                    onRefresh={fetchApiData}
+                                    onReply={(id) => {
+                                        setSelectedPatientId(id);
+                                        setActiveLabTab('communication');
+                                    }}
+                                />
                             )
                         }
                     </div >
@@ -1441,11 +1682,24 @@ export default function ProfessionalDashboard({ user }) {
                         {activeLabTab === 'collaboration' ? (
                             <CollaborationTab user={user} selectedPatientId={selectedPatientId} />
                         ) : activeLabTab === 'alerts' ? (
-                            <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                            <AlertsView
+                                professionalName={user.name}
+                                role={user.role}
+                                professionalId={user.id}
+                                apiAppointments={apiAppointments}
+                                onRefresh={fetchApiData}
+                                onReply={(id) => {
+                                    setSelectedPatientId(id);
+                                    setActiveLabTab('communication');
+                                }}
+                            />
                         ) : activeLabTab === 'patient-records' ? (
                             <Card>
                                 <div style={{ marginBottom: '1.5rem' }}>
-                                    <h3>Clinical Summary: {selectedPatient ? selectedPatient.name : 'Select Patient'}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                        <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '40px' }} />
+                                        <h3 style={{ margin: 0 }}>Clinical Summary: {selectedPatient ? selectedPatient.name : 'Select Patient'}</h3>
+                                    </div>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
                                         <div style={{ flex: 1 }}>
                                             <PatientAutofillInputs
@@ -1748,7 +2002,11 @@ export default function ProfessionalDashboard({ user }) {
                                                     <>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                                             <h3 style={{ margin: 0 }}>{currentTestData?.icon} {currentTestData?.name}</h3>
-                                                            <Button onClick={() => setActiveTest(null)} variant="secondary" size="sm">Cancel</Button>
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                <Button onClick={saveDraft} variant="secondary" size="sm">💾 Save Draft</Button>
+                                                                <Button onClick={() => setActiveTest(null)} variant="secondary" size="sm">Cancel</Button>
+                                                            </div>
+
                                                             <Button
                                                                 variant="primary"
                                                                 size="sm"
@@ -1781,8 +2039,10 @@ export default function ProfessionalDashboard({ user }) {
                                                                                 testId: activeTest,
                                                                                 testName: currentTestData?.name,
                                                                                 results: testResults,
-                                                                                metadata: metadata
+                                                                                metadata: metadata,
+                                                                                comments: labComments // [NEW] Include comments
                                                                             }
+
                                                                         });
 
                                                                         alert(`Results for ${currentTestData?.name} dispatched to patient record!`);
@@ -1853,12 +2113,23 @@ export default function ProfessionalDashboard({ user }) {
                                                                     </div>
                                                                 );
                                                             })}
+                                                            <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
+                                                                <label style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>👨‍💻 Comments & Recommendation</label>
+                                                                <textarea
+                                                                    className="input-field"
+                                                                    placeholder="Enter clinical validation comments or recommendations here..."
+                                                                    value={labComments}
+                                                                    onChange={(e) => setLabComments(e.target.value)}
+                                                                    style={{ width: '100%', minHeight: '120px', border: '2px solid #e2e8f0', borderRadius: '8px', padding: '1rem' }}
+                                                                />
+                                                            </div>
                                                         </div>
+
                                                     </>
                                                 );
                                             })()}
                                             <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-                                                <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Click "Dispatch Final" above to save clinical data.</p>
+                                                <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Click &quot;Dispatch Final&quot; above to save clinical data.</p>
                                             </div>
                                         </Card>
                                     )}
@@ -1932,7 +2203,7 @@ export default function ProfessionalDashboard({ user }) {
                                                     <>
                                                         <Card style={{ background: 'white', border: '1px solid #eee', padding: '1rem' }}>
                                                             <h4 style={{ fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
-                                                                📅 Today's Appointments
+                                                                📅 Today&apos;s Appointments
                                                                 <Badge variant="neutral">{myAppointmentsToday.length}</Badge>
                                                             </h4>
                                                             {myAppointmentsToday.length === 0 ? (
@@ -1982,6 +2253,24 @@ export default function ProfessionalDashboard({ user }) {
                                                                                 >
                                                                                     Process
                                                                                 </button>
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); setInvoiceData({ patient: app, isOpen: true }); }}
+                                                                                    className="btn-icon"
+                                                                                    title="Print Invoice"
+                                                                                    style={{ padding: '0.4rem', borderRadius: '50%', border: '1px solid #e2e8f0', cursor: 'pointer', background: 'white' }}
+                                                                                >
+                                                                                    🖨️
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        setSelectedPatient(app); // Assuming 'app' has patient details
+                                                                                        setActiveTab('records');
+                                                                                    }}
+                                                                                    className="btn-icon" title="View Records"
+                                                                                >
+                                                                                    Records
+                                                                                </button>
                                                                             </div>
                                                                         </div>
                                                                     ))}
@@ -2008,7 +2297,7 @@ export default function ProfessionalDashboard({ user }) {
 
                                     {uploadedFiles.length === 0 ? (
                                         <div style={{ textAlign: 'center', padding: '3rem', background: '#fcfcfc', borderRadius: '8px', border: '1px dashed #ddd' }}>
-                                            <p style={{ color: '#999' }}>No files uploaded yet. Start by selecting a unit and clicking "Upload Results".</p>
+                                            <p style={{ color: '#999' }}>No files uploaded yet. Start by selecting a unit and clicking &quot;Upload Results&quot;.</p>
                                         </div>
                                     ) : (
                                         <div style={{ overflowX: 'auto' }}>

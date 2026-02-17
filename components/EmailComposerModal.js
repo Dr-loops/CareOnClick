@@ -20,7 +20,7 @@ export default function EmailComposerModal({ isOpen, onClose, recipientEmail, re
                     to: recipientEmail,
                     subject: subject,
                     text: body, // Plain text version
-                    html: `<p>${body.replace(/\n/g, '<br>')}</p><br><hr><p>Sent from Dr. Kal's Virtual Hospital Official Portal</p>`
+                    html: `<p>${body.replace(/\n/g, '<br>')}</p><br><hr><p>Sent from CareOnClick Official Portal</p>`
                 })
             });
 

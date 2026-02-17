@@ -111,7 +111,7 @@ export async function POST(request) {
         let dataToSave = item ? { ...item } : null;
         let dataToUpdate = updates ? { ...updates } : null;
 
-        if (collection === 'patient_profiles') {
+        if (collection === 'patient_profiles' && action === 'add') {
             if (dataToSave) {
                 if (dataToSave.allergies) dataToSave.allergies = encrypt(dataToSave.allergies);
                 if (dataToSave.medicalHistory) dataToSave.medicalHistory = encrypt(dataToSave.medicalHistory);
@@ -124,7 +124,7 @@ export async function POST(request) {
             }
         }
 
-        if (collection === 'records') {
+        if (collection === 'records' && action === 'add') {
             if (dataToSave && dataToSave.structuredData) {
                 dataToSave.structuredData = encrypt(dataToSave.structuredData);
             }
@@ -134,8 +134,53 @@ export async function POST(request) {
         }
 
         if (action === 'add') {
-            await modelDelegate.create({ data: dataToSave });
-        } else if (action === 'update') {
+            const newRecord = await modelDelegate.create({ data: dataToSave });
+
+            // APPOINTMENT CONFIRMATION NOTIFICATIONS
+            if (collection === 'appointments' && newRecord) {
+                try {
+                    // 1. Fetch Patient for Contact Info
+                    const patient = await prisma.user.findUnique({ where: { id: newRecord.patientId } });
+
+                    if (patient) {
+                        const { date, time, professionalName, amountPaid, balanceDue } = newRecord;
+                        const msgBody = `Appointment Confirmed with ${professionalName} on ${new Date(date).toDateString()} at ${time}. Amount: GHS ${amountPaid}. Balance: GHS ${balanceDue}.`;
+
+                        // 2. Send SMS
+                        if (patient.phoneNumber) {
+                            await notificationService.sendSMS(patient.phoneNumber, `CareOnClick: ${msgBody}`);
+                        }
+
+                        // 3. Send Email
+                        if (patient.email) {
+                            await notificationService.sendEmail(
+                                patient.email,
+                                "Appointment Confirmation - CareOnClick",
+                                msgBody,
+                                `
+                                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                                    <h2 style="color: #0369a1;">Appointment Confirmed via CareOnClick</h2>
+                                    <p>Dear ${patient.name},</p>
+                                    <p>Your appointment has been successfully booked.</p>
+                                    <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                        <p><strong>Professional:</strong> ${professionalName}</p>
+                                        <p><strong>Date:</strong> ${new Date(date).toDateString()}</p>
+                                        <p><strong>Time:</strong> ${time}</p>
+                                        <p><strong>Paid:</strong> GHS ${amountPaid}</p>
+                                        <p><strong>Balance Due:</strong> GHS ${balanceDue}</p>
+                                    </div>
+                                    <p>Please log in to your dashboard for the video link or more details.</p>
+                                </div>
+                                `
+                            );
+                        }
+                    }
+                } catch (notifyErr) {
+                    console.error("Notification Logic Error", notifyErr);
+                }
+            }
+
+        } else if (action === 'update' || action === 'save') {
             // Handle both email (legacy user ID) and UUIDs
             let whereClause = { id };
 
@@ -170,26 +215,21 @@ export async function POST(request) {
             if (collection === 'patient_profiles') {
                 // SPECIAL HANDLER: Update both User and PatientProfile
                 // The 'id' passed here is usually 'pathNumber' (from frontend global_sync) or 'userId'
-                // The 'updates' object contains mixture of User fields (name, email, phone) and Profile fields (age, address, history)
+                // The 'updates' can be in 'updates' or 'item' (item is used by syncToServer for 'save' action)
+                const payload = updates || item;
+                if (!payload) throw new Error("No data provided for profile update");
 
-                console.log("Processing Patient Profile Update:", id, updates);
+                console.log("Processing Patient Profile Update:", id, payload);
 
                 // 1. Find the User first
-                let user = await prisma.user.findUnique({
-                    where: { id }
-                });
+                let user = await prisma.user.findUnique({ where: { id } });
 
                 if (!user) {
-                    // Try looking up by pathNumber
-                    user = await prisma.user.findUnique({
-                        where: { pathNumber: id }
-                    });
+                    user = await prisma.user.findUnique({ where: { pathNumber: id } });
                 }
 
-                if (!user) {
-                    user = await prisma.user.findUnique({
-                        where: { email: id } // Fallback if email passed as ID
-                    });
+                if (!user && id.includes('@')) {
+                    user = await prisma.user.findUnique({ where: { email: id } });
                 }
 
                 if (!user) {
@@ -197,36 +237,47 @@ export async function POST(request) {
                 }
 
                 // 2. Prepare Data Split
-                // User Fields: name, email, phone, region, country
+                // User Table Fields
                 const userFields = {};
-                if (updates.fullName) userFields.name = updates.fullName;
-                if (updates.email) userFields.email = updates.email;
-                if (updates.phone) userFields.phoneNumber = updates.phone;
-                if (updates.region) userFields.region = updates.region;
-                if (updates.country) userFields.country = updates.country; // Assuming 'country' added to schema in previous step? Schema has it? Yes verified.
+                if (payload.fullName || payload.name) userFields.name = (payload.fullName || payload.name).trim();
+                if (payload.email) userFields.email = payload.email;
+                if (payload.phone || payload.phoneNumber) userFields.phoneNumber = payload.phone || payload.phoneNumber;
+                if (payload.whatsappNumber !== undefined) userFields.whatsappNumber = payload.whatsappNumber;
+                if (payload.region) userFields.region = payload.region;
+                if (payload.country) userFields.country = payload.country;
+                if (payload.address) userFields.address = payload.address;
+                if (payload.avatarUrl) userFields.avatarUrl = payload.avatarUrl;
 
-                // Profile Fields: address, gender, dateOfBirth (from age), medicalHistory, allergies
+                // Profile Table Fields
                 const profileFields = {};
-                if (updates.address) profileFields.address = updates.address;
-                if (updates.sex) profileFields.gender = updates.sex;
-                if (updates.region) profileFields.region = updates.region; // Sync to Profile
-                if (updates.phone) profileFields.phoneNumber = updates.phone; // Sync to Profile
+                if (payload.address) profileFields.address = payload.address;
+                if (payload.sex || payload.gender) profileFields.gender = payload.sex || payload.gender;
+                if (payload.phoneNumber || payload.phone) profileFields.phoneNumber = payload.phoneNumber || payload.phone;
+                if (payload.region) profileFields.region = payload.region;
+                if (payload.allergies) profileFields.allergies = encrypt(payload.allergies);
+                if (payload.medicalHistory) profileFields.medicalHistory = encrypt(payload.medicalHistory);
+                if (payload.currentMedications) profileFields.currentMedications = encrypt(payload.currentMedications);
+                if (payload.conditionStatus) profileFields.conditionStatus = payload.conditionStatus;
+                if (payload.admissionStatus) profileFields.admissionStatus = payload.admissionStatus;
 
-                if (updates.allergies) profileFields.allergies = encrypt(updates.allergies);
-                if (updates.medicalHistory) profileFields.medicalHistory = encrypt(updates.medicalHistory);
-                if (updates.currentMedications) profileFields.currentMedications = encrypt(updates.currentMedications);
-
-                // Calculate DOB from Age if provided (approximate)
-                if (updates.age) {
-                    const ageMetadata = parseInt(updates.age);
-                    if (!isNaN(ageMetadata)) {
-                        const today = new Date();
-                        const birthYear = today.getFullYear() - ageMetadata;
-                        profileFields.dateOfBirth = new Date(`${birthYear}-01-01`); // Approx Jan 1st
+                // 3. Handle Date of Birth (Age to DOB or direct DOB)
+                if (payload.dob || payload.dateOfBirth) {
+                    profileFields.dateOfBirth = new Date(payload.dob || payload.dateOfBirth);
+                } else if (payload.age) {
+                    const ageVal = parseInt(payload.age);
+                    if (!isNaN(ageVal)) {
+                        const birthDate = new Date();
+                        birthDate.setFullYear(birthDate.getFullYear() - ageVal);
+                        birthDate.setMonth(0); // Standardize to Jan
+                        birthDate.setDate(1);  // Standardize to 1st
+                        profileFields.dateOfBirth = birthDate;
                     }
                 }
 
-                // 3. Perform Transactional Update
+                // Remove undefined to avoid Prisma errors if fields were empty strings but we want them cleared
+                // For strings, empty is fine. For Int/DateTime, we want valid or undefined.
+
+                // 4. Perform Transactional Update
                 await prisma.$transaction([
                     prisma.user.update({
                         where: { id: user.id },
@@ -242,7 +293,7 @@ export async function POST(request) {
                     })
                 ]);
 
-                console.log("Successfully updated/upserted profile for User:", user.email);
+                console.log("Successfully updated User/Profile for:", user.email);
                 return NextResponse.json({ success: true });
             }
 
@@ -256,6 +307,16 @@ export async function POST(request) {
                 throw e;
             }
         } else if (action === 'delete') {
+            if (collection === 'users') {
+                // Manual Cascade for Relations without onDelete: Cascade in Schema
+                await prisma.appointment.deleteMany({
+                    where: { OR: [{ patientId: id }, { professionalId: id }] }
+                });
+                await prisma.message.deleteMany({
+                    where: { senderId: id }
+                });
+                // PatientProfile, Notification, VitalSign, Task have Cascade configured in Schema
+            }
             await modelDelegate.delete({ where: { id } });
         }
 

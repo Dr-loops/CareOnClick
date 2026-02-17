@@ -5,7 +5,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-const CalendarView = ({ events, onDateClick, onEventClick, userRole }) => {
+const CalendarView = ({ events, onDateClick, onEventClick }) => {
     return (
         <div className="calendar-container card">
             <style jsx global>{`

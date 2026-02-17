@@ -1,29 +1,72 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { saveGlobalRecord, updatePatientVitals, sendGlobalMessage, getGlobalData, KEYS, updateNotificationStatus, updateAppointment } from '@/lib/global_sync';
+import { saveGlobalRecord, getGlobalData, KEYS, updateNotificationStatus, updateAppointment } from '@/lib/global_sync';
 import { analyzeResult, analyzeBP } from '@/lib/medical_analysis';
 import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
+import { useSWRConfig } from 'swr'; // [FIX] Import SWR Config
+import { getSocket } from '@/lib/socket';
+
 import PatientRecordFinder from './PatientRecordFinder';
 
 import CollaborationTab from './CollaborationTab';
-import { AI_SUGGESTIONS, CLINICAL_ALERTS } from '@/lib/physician_data';
+import { AI_SUGGESTIONS } from '@/lib/physician_data';
 import Toast from './Toast';
 import { usePatients, useTasks } from '@/lib/hooks/useClinicalData';
+import { useStaff } from '@/lib/hooks/useStaff';
 import VitalsMonitor from './VitalsMonitor';
 import PatientList from './PatientList';
 import DictationRecorder from './DictationRecorder';
-import PatientAutofillInputs from './ui/PatientAutofillInputs';
 import WhatsAppButton from './WhatsAppButton';
 import CommunicationHub from './CommunicationHub';
 import VideoConsultation from './VideoConsultation'; // [NEW]
+import ProfileModal from './ProfileModal'; // [NEW]
+import BillingInvoiceModal from './BillingInvoiceModal'; // [NEW] Invoice Modal
 
 
-const AlertsView = ({ professionalName, role, professionalId }) => {
+const AlertsView = ({ professionalName, role, professionalId, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
+
     const notifications = getGlobalData(KEYS.NOTIFICATIONS, []);
     const myNotifications = notifications.filter(n =>
         (n.professionalName === professionalName || n.recipientId === role || n.recipientId === professionalId || n.recipientId === 'STAFF') &&
         n.status !== 'Dismissed'
     );
+
+    const fetchMessages = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                // Filter for messages where I am the recipient
+                const incoming = data.filter(m => m.recipientId === professionalId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Failed to fetch messages", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = getSocket();
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+            };
+        }
+    }, [professionalId]);
 
     const handleAction = (id, action) => {
         if (action === 'Dismiss') {
@@ -32,37 +75,57 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
             const notif = notifications.find(n => n.id === id);
             updateNotificationStatus(id, { status: 'Accepted' });
 
-            // Log confirmation activity
             if (notif && notif.details?.appointmentId) {
                 updateAppointment(notif.details.appointmentId, {
                     status: 'Confirmed',
                     updatedBy: professionalName
                 });
             }
-
             alert('Appointment Accepted! Patient will be notified.');
         } else if (action === 'Snooze') {
             updateNotificationStatus(id, { status: 'Snoozed' });
         }
     };
 
+    // Merge notifications and messages for a unified timeline
+    const allAlerts = [
+        ...myNotifications.map(n => ({ ...n, alertType: 'NOTIFICATION' })),
+        ...messages.map(m => ({
+            id: m.id,
+            title: `Message from ${m.senderName}`,
+            message: m.content,
+            timestamp: m.timestamp,
+            status: 'Unread', // For UI
+            type: 'CHAT',
+            senderId: m.senderId,
+            alertType: 'MESSAGE'
+        }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
     return (
         <div className="card" style={{ padding: '2rem' }}>
-            <h3>Recent Alerts & Notifications 🔔</h3>
-            <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Stay updated with patient bookings and payment confirmations.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                    <h3>Recent Alerts & Messages 🔔</h3>
+                    <p style={{ color: '#64748b', margin: 0 }}>Stay updated with patient activities and staff communications.</p>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={fetchMessages} disabled={loading}>
+                    {loading ? '...' : '↻ Refresh'}
+                </button>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {myNotifications.length === 0 ? (
+                {allAlerts.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
                         <h4>No new alerts</h4>
                         <p style={{ color: '#64748b' }}>Check back later for new patient activities.</p>
                     </div>
                 ) : (
-                    myNotifications.map(notif => (
-                        <div key={notif.id} className="card" style={{
-                            borderLeft: `5px solid ${notif.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981'}`,
-                            background: notif.status === 'Unread' ? '#f0f9ff' : 'white',
+                    allAlerts.map(alertItem => (
+                        <div key={alertItem.id} className="card" style={{
+                            borderLeft: `5px solid ${alertItem.alertType === 'MESSAGE' ? '#8b5cf6' : (alertItem.type === 'APPOINTMENT_BOOKING' ? '#3b82f6' : '#10b981')}`,
+                            background: alertItem.status === 'Unread' ? '#f0f9ff' : 'white',
                             position: 'relative',
                             padding: '1.5rem',
                             borderRadius: '8px',
@@ -71,59 +134,34 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                 <div>
-                                    <h4 style={{ margin: 0, color: '#1e293b' }}>{notif.title}</h4>
-                                    <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0' }}>{new Date(notif.timestamp).toLocaleString()}</p>
+                                    <h4 style={{ margin: 0, color: '#1e293b' }}>{alertItem.title}</h4>
+                                    <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0' }}>{new Date(alertItem.timestamp).toLocaleString()}</p>
                                 </div>
                                 <span style={{
                                     padding: '0.2rem 0.6rem',
                                     borderRadius: '20px',
                                     fontSize: '0.7rem',
                                     fontWeight: 'bold',
-                                    background: notif.status === 'Accepted' ? '#dcfce7' : '#f1f5f9',
-                                    color: notif.status === 'Accepted' ? '#15803d' : '#475569'
+                                    background: alertItem.status === 'Accepted' ? '#dcfce7' : '#f1f5f9',
+                                    color: alertItem.status === 'Accepted' ? '#15803d' : '#475569'
                                 }}>
-                                    {notif.status}
+                                    {alertItem.status}
                                 </span>
                             </div>
-                            <p style={{ margin: '0 0 1rem 0' }}>{notif.message}</p>
+                            <p style={{ margin: '0 0 1rem 0' }}>{alertItem.message}</p>
 
-                            {notif.details && (
-                                <div style={{ background: '#f8fafc', padding: '0.8rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                                    {notif.type === 'APPOINTMENT_BOOKING' ? (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Type:</strong> {notif.details.appointmentType}</div>
-                                            <div><strong>Date:</strong> {notif.details.date} at {notif.details.time}</div>
-                                            <div><strong>Reason:</strong> {notif.details.reason}</div>
-                                            {notif.details.balanceDue > 0 ? (
-                                                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontWeight: 'bold' }}>
-                                                    ⚠️ Part Payment: GHS {notif.details.amountPaid} (Bal: {notif.details.balanceDue})
-                                                </div>
-                                            ) : notif.details.amountPaid ? (
-                                                <div style={{ marginTop: '0.5rem', color: '#16a34a', fontWeight: 'bold' }}>
-                                                    ✅ Full Payment: GHS {notif.details.amountPaid}
-                                                </div>
-                                            ) : null}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div><strong>Patient:</strong> {notif.details.patientName}</div>
-                                            <div><strong>Amount:</strong> {notif.details.amount}</div>
-                                            <div><strong>Status:</strong> <span style={{ color: '#10b981', fontWeight: 'bold' }}>Confirmed</span></div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                {notif.type === 'APPOINTMENT_BOOKING' && notif.status !== 'Accepted' && (
+                            <div className="alert-actions" style={{ display: 'flex', gap: '0.8rem' }}>
+                                {alertItem.alertType === 'NOTIFICATION' ? (
                                     <>
-                                        <button onClick={() => handleAction(notif.id, 'Accept')} className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Accept</button>
-                                        <button onClick={() => alert('Feature coming soon: Suggesting alternative time.')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Suggest Alt Time</button>
+                                        <button className="btn btn-primary btn-sm" onClick={() => handleAction(alertItem.id, 'Accept')}>Accept</button>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => handleAction(alertItem.id, 'Dismiss')}>Dismiss</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button className="btn btn-primary btn-sm" onClick={() => onReply(alertItem.senderId)}>💬 Reply</button>
+                                        <button className="btn btn-secondary btn-sm">Archive</button>
                                     </>
                                 )}
-                                <button onClick={() => handleAction(notif.id, 'Snooze')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Snooze</button>
-                                <button onClick={() => handleAction(notif.id, 'Dismiss')} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', color: '#dc2626' }}>Dismiss</button>
                             </div>
                         </div>
                     ))
@@ -133,20 +171,43 @@ const AlertsView = ({ professionalName, role, professionalId }) => {
     );
 };
 
-// Mocks removed
-
 
 export default function NurseDashboard({ user }) {
     useGlobalSync();
-    const [activeTab, setActiveTab] = useState('patients');
+    // const router = useRouter(); // Unused
+    const { staff } = useStaff();
+
+
+    const { mutate } = useSWRConfig(); // [FIX] Get mutate function
+    const [activeTab, setActiveTab] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPatientId, setSelectedPatientId] = useState(null);
-    const [selectedPatientName, setSelectedPatientName] = useState(''); // For global sync
+    const [invoiceData, setInvoiceData] = useState(null); // [NEW] { patient: {}, isOpen: true/false }
+
+    // [NEW] Profile Modal State
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [userProfile, setUserProfile] = useState(user); // Local user state for immediate updates
+
+    // Sync userProfile with latest data from useStaff (truth from DB)
+    useEffect(() => {
+        if (staff && staff.length > 0) {
+            const me = staff.find(s => s.id === user.id);
+            if (me) {
+                console.log("Syncing fresh profile data", me);
+                setUserProfile(prev => ({ ...prev, ...me }));
+            }
+        }
+    }, [staff, user.id]);
 
     // Vitals Entry State
     const [vitalsInput, setVitalsInput] = useState({
         hr: '', bp: '', spo2: '', temp: '', rr: '', weight: '', glucose: ''
     });
+
+    const handleVitalChange = (e) => {
+        const { name, value } = e.target;
+        setVitalsInput(prev => ({ ...prev, [name]: value }));
+    };
 
     // Fetch Real Data
     const { patients, isLoading: isLoadingPatients } = usePatients(searchQuery);
@@ -174,13 +235,9 @@ export default function NurseDashboard({ user }) {
         whatsappNumber: p.whatsappNumber || p.profile?.whatsappNumber
     }));
 
-    const [chatMessage, setChatMessage] = useState('');
-
     const [isRecording, setIsRecording] = useState(false);
     const [dictatedNote, setDictatedNote] = useState('');
     const [toast, setToast] = useState(null);
-    const [messages, setMessages] = useState([]);
-    const [loadingMessages, setLoadingMessages] = useState(false);
 
     // [NEW] Patient Engagement & Requests State
     const [selectedFile, setSelectedFile] = useState(null);
@@ -236,7 +293,6 @@ export default function NurseDashboard({ user }) {
 
 
     // Load dynamic vitals and notes from global store
-    const globalVitals = getGlobalData(KEYS.VITALS, {});
     const globalRecords = getGlobalData(KEYS.RECORDS, []);
 
     // Group notes by patientId from global records
@@ -323,9 +379,47 @@ export default function NurseDashboard({ user }) {
         alert('Nursing note has been filed globally.');
     };
 
+    // [NEW] Handle Profile Update
+    const handleProfileUpdate = (updatedUser) => {
+        setUserProfile(updatedUser);
+        setIsProfileOpen(false);
+        alert('Profile updated successfully!');
+    };
+
+    // [FIX] Added missing getAnalysis helper
+    const getAnalysis = (fieldName, value) => {
+        if (!value) return null;
+        // Safely handle missing selectedPatient
+        const sp = selectedPatient || {};
+        const age = sp.age && sp.age !== 'N/A' ? parseInt(sp.age) : 30;
+        const sex = sp.gender || 'Male';
+
+        if (fieldName === 'bp') return analyzeBP(value, age);
+
+        const map = {
+            'hr': { cat: 'VITALS', test: 'HR' },
+            'spo2': { cat: 'VITALS', test: 'SpO2' },
+            'temp': { cat: 'VITALS', test: 'Temp' },
+            'rr': { cat: 'VITALS', test: 'RR' },
+            'glucose': { cat: 'VITALS', test: 'Glucose' },
+        };
+
+        const def = map[fieldName];
+        if (!def) return null;
+
+        return analyzeResult(def.cat, def.test, value, age, sex);
+    };
+
     // Helper functions removed (renderVitalsCard)
     return (
         <div className="nurse-grid">
+            {isProfileOpen && (
+                <ProfileModal
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
+                    onSave={handleProfileUpdate}
+                />
+            )}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
             <style jsx>{`
                 .nurse-grid { display: grid; grid-template-columns: 240px 1fr; min-height: 80vh; gap: 1px; background: #eee; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
@@ -351,9 +445,32 @@ export default function NurseDashboard({ user }) {
             {/* Sidebar Navigation */}
             <aside style={{ background: 'white', borderRight: '1px solid #eee' }}>
                 <div style={{ padding: '1.5rem', borderBottom: '1px solid #eee', textAlign: 'center' }}>
-                    <div style={{ width: '60px', height: '60px', background: 'var(--color-navy)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', margin: '0 auto 0.5rem' }}>👩‍⚕️</div>
-                    <h4 style={{ margin: 0 }}>{user.name}</h4>
-                    <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>Registered Nurse</p>
+                    <div
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{
+                            width: '80px', height: '80px', background: 'var(--color-navy)', color: 'white',
+                            borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '2rem', margin: '0 auto 0.5rem', cursor: 'pointer', overflow: 'hidden',
+                            border: '3px solid #e2e8f0', transition: 'transform 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                        title="Click to Edit Profile"
+                    >
+                        {userProfile.avatarUrl ? (
+                            <img src={userProfile.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            '👩‍⚕️'
+                        )}
+                    </div>
+                    <h4 style={{ margin: 0 }}>{userProfile.name}</h4>
+                    <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>{userProfile.specialization || 'Registered Nurse'}</p>
+                    <button
+                        onClick={() => setIsProfileOpen(true)}
+                        style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.75rem', marginTop: '0.2rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Edit Profile
+                    </button>
                 </div>
                 <nav>
                     <button onClick={() => setActiveTab('patients')} className={`nav-btn ${activeTab === 'patients' ? 'active' : ''}`}>👥 Patient List</button>
@@ -411,7 +528,10 @@ export default function NurseDashboard({ user }) {
                         <div>
                             <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <h3 style={{ margin: 0 }}>Patient Information</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                        <img src="/logo_new.jpg" alt="CareOnClick Logo" style={{ height: '40px' }} />
+                                        <h3 style={{ margin: 0 }}>Patient Information</h3>
+                                    </div>
                                     {searchQuery && <span style={{ fontSize: '0.75rem', color: 'var(--color-navy)', fontWeight: 'bold' }}>MATCH FOUND</span>}
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
@@ -453,6 +573,15 @@ export default function NurseDashboard({ user }) {
                                         onSave={(note) => handleAddNote(selectedPatient.id, note)}
                                         placeholder="Type or dictate nursing note..."
                                     />
+                                    {/* [NEW] Print Invoice Button */}
+                                    <button
+                                        onClick={() => setInvoiceData({ patient: selectedPatient, isOpen: true })}
+                                        className="btn btn-secondary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px solid #ccc', background: 'white' }}
+                                        title="Generate Patient Bill"
+                                    >
+                                        🖨️ Invoice
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -543,6 +672,18 @@ export default function NurseDashboard({ user }) {
                     </div>
                 )}
 
+
+                {/* Billing Invoice Modal */}
+                {invoiceData && (
+                    <BillingInvoiceModal
+                        isOpen={invoiceData.isOpen}
+                        onClose={() => setInvoiceData(null)}
+                        patient={invoiceData.patient}
+                        professionalName={user.name}
+                        professionalRole="Nurse"
+                    />
+                )}
+
                 {activeTab === 'monitoring' && (
                     <div className="card" style={{ padding: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -582,6 +723,24 @@ export default function NurseDashboard({ user }) {
 
                                         if (res.ok) {
                                             alert('Vitals recorded successfully!');
+
+                                            // [NEW] Real-time Socket Notification to Patient
+                                            const socket = getSocket();
+                                            if (socket) {
+                                                socket.emit('send_notification', {
+                                                    recipientId: selectedPatientId,
+                                                    type: 'VITALS_UPDATED',
+                                                    title: 'Vitals Updated',
+                                                    message: 'Your latest vital signs have been recorded by the nurse.',
+                                                });
+                                            }
+
+                                            // [FIX] Immediate Refresh
+                                            // Mutate vitals for this patient to update EKG/Charts
+                                            mutate(`/api/vitals?patientId=${selectedPatientId}`);
+                                            // Mutate patient list to update "Latest Vital" column
+                                            mutate((key) => typeof key === 'string' && key.startsWith('/api/patients'));
+
                                             // Keep form data per user request
                                             // setVitalsInput({ hr: '', bp: '', spo2: '', temp: '', rr: '', weight: '', glucose: '' }); 
                                             // Ideally refresh vitals view here
@@ -658,6 +817,7 @@ export default function NurseDashboard({ user }) {
                     <CommunicationHub
                         user={user}
                         patients={normalizedPatients}
+                        staff={staff}
                         initialPatientId={selectedPatientId}
                         onPatientSelect={(p) => setSelectedPatientId(p.id)}
                     />
@@ -844,7 +1004,7 @@ export default function NurseDashboard({ user }) {
                                                 <strong>From: {req.from}</strong>
                                                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{req.time}</span>
                                             </div>
-                                            <p style={{ fontSize: '0.9rem', margin: 0 }}>"{req.message}"</p>
+                                            <p style={{ fontSize: '0.9rem', margin: 0 }}>&quot;{req.message}&quot;</p>
                                             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                                                 <button className="btn btn-secondary" style={{ fontSize: '0.7rem' }} onClick={() => markRequestDone(req.id)}>✅ Mark as Done</button>
                                                 <button className="btn btn-secondary" style={{ fontSize: '0.7rem' }}>Reply</button>
@@ -892,9 +1052,17 @@ export default function NurseDashboard({ user }) {
                     </div>
                 )}
 
-                {/* Alerts Tab */}
+                {/* Alerts & Messages Tab */}
                 {activeTab === 'alerts' && (
-                    <AlertsView professionalName={user.name} role={user.role} professionalId={user.id} />
+                    <AlertsView
+                        professionalName={user.name}
+                        role={user.role}
+                        professionalId={user.id}
+                        onReply={(senderId) => {
+                            setSelectedPatientId(senderId);
+                            setActiveTab('communication');
+                        }}
+                    />
                 )}
 
                 <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '2px dashed #eee', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -922,6 +1090,26 @@ export default function NurseDashboard({ user }) {
                     </div>
                 </div>
             </main>
+
+            {/* Profile Modal */}
+            {isProfileOpen && (
+                <ProfileModal
+                    user={userProfile}
+                    onClose={() => setIsProfileOpen(false)}
+                    onSave={handleProfileUpdate}
+                />
+            )}
+
+            {/* Billing Invoice Modal */}
+            {invoiceData && (
+                <BillingInvoiceModal
+                    isOpen={invoiceData.isOpen}
+                    onClose={() => setInvoiceData(null)}
+                    patient={invoiceData.patient}
+                    professionalName={user.name}
+                    professionalRole="Nurse"
+                />
+            )}
         </div>
     );
 }

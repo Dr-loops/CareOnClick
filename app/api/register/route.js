@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import notificationService from '@/lib/notifications';
+import { notificationService } from '@/lib/notifications';
 
 export async function POST(request) {
     try {
@@ -97,24 +97,24 @@ export async function POST(request) {
                 whatsappNumber: otherData.whatsappNumber,
 
                 // Professional Fields (Nullable for patients)
-                licenseNumber: otherData.licenseNumber,
-                yearsOfExperience: otherData.yearsOfExperience ? parseInt(otherData.yearsOfExperience) : null,
-                currentFacility: otherData.currentFacility,
-                facilityType: otherData.facilityType,
+                licenseNumber: otherData.licenseNumber || null,
+                yearsOfExperience: (otherData.yearsOfExperience && !isNaN(parseInt(otherData.yearsOfExperience))) ? parseInt(otherData.yearsOfExperience) : null,
+                currentFacility: otherData.currentFacility || null,
+                facilityType: otherData.facilityType || null,
             },
         });
 
         // --- NOTIFICATIONS ---
         try {
             // Welcome Email
-            const emailSubject = `Welcome to Dr. Kal's Virtual Hospital!`;
+            const emailSubject = `Welcome to CareOnClick!`;
             const emailHtml = `
                 <h1>Welcome, ${name}!</h1>
-                <p>Thank you for registering at Dr. Kal's Virtual Hospital.</p>
+                <p>Thank you for registering at CareOnClick.</p>
                 <p>Your Member ID is: <strong>${newUser.id}</strong></p>
                 <p>You can now login to access our services.</p>
                 <br>
-                <p>Best regards,<br>The Dr. Kal Team</p>
+                <p>Best regards,<br>The CareOnClick Team</p>
             `;
             await notificationService.sendEmail(email, emailSubject, `Welcome ${name}!`, emailHtml);
 
@@ -122,7 +122,7 @@ export async function POST(request) {
             if (newUser.phoneNumber) {
                 await notificationService.sendSMS(
                     newUser.phoneNumber,
-                    `Welcome to Dr. Kal's Hospital! Your account (${newUser.id}) is ready.`
+                    `Welcome to CareOnClick! Your account (${newUser.id}) is ready.`
                 );
             }
         } catch (noteError) {
@@ -134,6 +134,6 @@ export async function POST(request) {
 
     } catch (error) {
         console.error("Registration Error", error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: error.message || 'Registration failed' }, { status: 500 });
     }
 }

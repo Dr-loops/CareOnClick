@@ -33,12 +33,12 @@ function AuthStateAdapter({ children }) {
         }
     }, [session, status]);
 
-    const login = async (email, password) => {
+    const login = async (emailOrId, password) => {
         try {
             console.log("Attempting login via NextAuth...");
             const result = await signIn("credentials", {
                 redirect: false,
-                email,
+                emailOrId,
                 password
             });
 
@@ -46,11 +46,12 @@ function AuthStateAdapter({ children }) {
 
             if (result?.error) {
                 console.error("Login Error:", result.error);
-                return { success: false, error: 'Invalid credentials. Please check your email/password.' };
+                return { success: false, error: `Login Failed (${result.error}): Please check your email/password.` };
             }
 
             if (result?.ok) {
                 console.log("Login Successful, redirecting to /dashboard");
+                alert(`✅ LOGIN SUCCESS: Authenticated as ${emailOrId}`);
                 router.push('/dashboard');
                 router.refresh(); // Ensure strict refresh of session state
                 return { success: true };
@@ -78,14 +79,9 @@ function AuthStateAdapter({ children }) {
             }
 
             if (result.success) {
-                // If Verified (Patient), Auto-Login
-                if (data.role === ROLES.PATIENT || data.role === ROLES.ADMIN) {
-                    await login(data.email, data.password);
-                    alert(`✅ Registration Successful!\n\nWelcome email and SMS confirmation sent to ${data.email} and your phone number.`);
-                } else {
-                    alert(`⏳ Registration Submitted!\n\nA verification request has been sent to ${data.email}.\nYou will be notified once an administrator approves your account.`);
-                    router.push('/login');
-                }
+                // Modified: User requested explicit login step instead of auto-login
+                alert(`✅ Registration Successful!\n\nA confirmation has been sent to ${data.email}.\nPlease log in with your credentials to continue.`);
+                router.push('/login');
                 return { success: true };
             }
         } catch (error) {

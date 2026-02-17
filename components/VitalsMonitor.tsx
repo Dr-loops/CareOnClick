@@ -25,10 +25,9 @@ interface VitalsMonitorProps {
 }
 
 export default function VitalsMonitor({ patient, minimal = false }: VitalsMonitorProps) {
-    if (!patient) return <div className="p-4 text-center text-gray-500">Select a patient to view vitals.</div>;
+    const { vitals: history, latestVital, isLoading } = useVitals(patient ? patient.id : '');
 
-    // Fetch real historical vitals
-    const { vitals: history, latestVital, isLoading } = useVitals(patient.id);
+    if (!patient) return <div className="p-4 text-center text-gray-500">Select a patient to view vitals.</div>;
 
     // Use latest from API if available, otherwise fall back to prop
     const hr = latestVital?.hr || patient.vitals?.hr || 72;
@@ -88,7 +87,10 @@ export default function VitalsMonitor({ patient, minimal = false }: VitalsMonito
     return (
         <Card className="vitals-monitor-card">
             <div className={`vitals-header ${minimal ? 'minimal' : ''}`}>
-                <h3>Real-time Vitals Monitoring</h3>
+                <div className="vitals-header-content">
+                    <img src="/logo_new.jpg" alt="CareOnClick Logo" className={`vitals-logo ${minimal ? 'minimal' : ''}`} />
+                    <h3 className="vitals-title">Real-time Vitals Monitoring</h3>
+                </div>
                 <Button variant="secondary" size="small">📡 Connect Wearable</Button>
             </div>
 

@@ -22,9 +22,103 @@ const colors = {
     textLight: '#64748b', // Slate 500
 };
 
+const AlertsView = ({ userName, role, userId, onReply }) => {
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchMessages = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/messages');
+            if (res.ok) {
+                const data = await res.json();
+                // Filter for messages where I am the recipient
+                const incoming = data.filter(m => m.recipientId === userId);
+                setMessages(incoming);
+            }
+        } catch (e) {
+            console.error("Failed to fetch messages", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMessages();
+
+        const socket = typeof window !== 'undefined' ? require('@/lib/socket').getSocket() : null;
+        if (socket) {
+            const handleUpdate = () => {
+                fetchMessages();
+            };
+            socket.on('receive_message', handleUpdate);
+            socket.on('notification', handleUpdate);
+
+            return () => {
+                socket.off('receive_message', handleUpdate);
+                socket.off('notification', handleUpdate);
+            };
+        }
+    }, [userId]);
+
+    return (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b' }}>Recent Alerts & Messages 🔔</h3>
+                    <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' }}>Stay updated with staff communications and patient requests.</p>
+                </div>
+                <button
+                    onClick={fetchMessages}
+                    disabled={loading}
+                    style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}
+                >
+                    {loading ? '...' : '↻ Refresh'}
+                </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {messages.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📭</div>
+                        <h4 style={{ fontWeight: 'bold' }}>No new messages</h4>
+                        <p style={{ color: '#64748b' }}>Your inbox is clear.</p>
+                    </div>
+                ) : (
+                    messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(m => (
+                        <div key={m.id} style={{
+                            padding: '20px',
+                            background: 'white',
+                            borderRadius: '12px',
+                            border: '1px solid #eee',
+                            borderLeft: '5px solid #0ea5e9',
+                            position: 'relative'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <h4 style={{ margin: 0, fontWeight: 'bold' }}>Message from {m.senderName}</h4>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{new Date(m.timestamp).toLocaleString()}</span>
+                            </div>
+                            <p style={{ margin: '0 0 16px 0', color: '#334155', lineHeight: 1.5 }}>{m.content}</p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => onReply(m.senderId)}
+                                    style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: '#0ea5e9', color: 'white', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' }}
+                                >
+                                    💬 Reply
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
+
 export default function AdminDashboard({ user }) {
     useGlobalSync();
     const [activeTab, setActiveTab] = useState('overview');
+    const [selectedChatTarget, setSelectedChatTarget] = useState(null);
     const [emailComposerData, setEmailComposerData] = useState(null); // { email, name }
     const [expandedBookingGroups, setExpandedBookingGroups] = useState({});
 
@@ -55,6 +149,11 @@ export default function AdminDashboard({ user }) {
     const [financialFilter, setFinancialFilter] = useState('all'); // all, revenue, paid, outstanding
     const [financeSearch, setFinanceSearch] = useState('');
     const [addingFinance, setAddingFinance] = useState(null); // { patientId, name } for Add Modal
+
+    // Security State
+    const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+    const [passLoading, setPassLoading] = useState(false);
+    const [passStatus, setPassStatus] = useState({ type: '', message: '' });
 
     // Hooks
     useEffect(() => {
@@ -176,6 +275,22 @@ export default function AdminDashboard({ user }) {
         }
     }, [activeTab]);
 
+    const handleAvatarUpload = (e, setter, currentData) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 1024 * 1024) {
+            alert('Image too large. Please select an image under 1MB.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setter({ ...currentData, avatarUrl: reader.result });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const appointments = dbAppointments;
 
     // Unified Staff Data Logic
@@ -246,40 +361,38 @@ export default function AdminDashboard({ user }) {
         }
     };
 
-    const handleDeleteUser = async (id) => {
-        if (!confirm("Are you sure you want to delete this patient? This action cannot be undone and will remove all their financial records.")) return;
+    const handleDeleteUser = async (id, role = 'User') => {
+        const confirmMessage = role.toLowerCase() === 'patient'
+            ? "Are you sure you want to delete this PATIENT? This action cannot be undone and will remove all their medical records, appointments, and financial history."
+            : `Are you sure you want to delete this STAFF MEMBER (${role})? This will remove their access and unassign them from all appointments.`;
 
-        // 1. Remove User
+        if (!confirm(confirmMessage)) return;
+
+        // 1. Remove User from Local State
         setDbUsers(prev => prev.filter(u => u.id !== id));
 
-        // 2. Cascade Remove Appointments (Updates Financial KPIs instantly)
-        setDbAppointments(prev => prev.filter(a => a.patientId !== id));
+        // 2. Cascade Remove Appointments (Visual Update)
+        setDbAppointments(prev => prev.filter(a => a.patientId !== id && a.professionalId !== id));
 
         try {
-            // Delete User
             await fetch('/api/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ collection: 'users', action: 'delete', id })
             });
 
-            // Cascade Delete Appointments (Optional strict consistency, or relying on frontend logic)
-            // Ideally backend handles this, but for "Real Actions" visual:
-            // We'll leave it as frontend-state driven for now or implement a loop if needed.
-            // But deleting the User usually orphans the records. Ideally we delete them too.
-            // For now, visual update is key.
-
-            alert("Patient and financial records deleted successfully.");
+            alert(`${role} deleted successfully.`);
         } catch (e) {
             console.error("Failed to delete user", e);
             alert("Failed to delete user.");
+            fetchUsers(); // Revert on failure
         }
     };
 
 
     const exportData = () => {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        let csvContent = `DR KAL'S VIRTUAL HOSPITAL - DAILY ACTIVITY REPORT\nGenerated on: ${new Date().toLocaleString()}\n\n`;
+        let csvContent = `CAREONCLICK - DAILY ACTIVITY REPORT\nGenerated on: ${new Date().toLocaleString()}\n\n`;
 
         // 1. PATIENT PROFILES REPORT
         csvContent += "SECTION 1: REGISTERED PATIENT PERSONAL DATA\n";
@@ -319,57 +432,55 @@ export default function AdminDashboard({ user }) {
     // --- PATIENT MANAGEMENT ---
     const handleSavePatient = async (updatedData) => {
         try {
-            // 1. Update Core User Data (Name, Phone, WhatsApp) via /api/db
-            await fetch('/api/db', {
+            // Prepare Unified Payload for Backend Sync
+            const payload = {
+                ...updatedData,
+                fullName: updatedData.name,
+                phoneNumber: updatedData.phoneNumber,
+                whatsappNumber: updatedData.whatsappNumber,
+                sex: updatedData.sex,
+                address: updatedData.address,
+                age: updatedData.age,
+                medicalHistory: updatedData.medicalHistory,
+                allergies: updatedData.allergies,
+                currentMedications: updatedData.currentMedications,
+                region: updatedData.region,
+                country: updatedData.country
+            };
+
+            // 1. Update via Unified DB Sync (Handles both tables)
+            const res = await fetch('/api/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    collection: 'users',
-                    action: 'update',
+                    collection: 'patient_profiles',
+                    action: 'save',
                     id: updatedData.id,
-                    updates: {
-                        name: updatedData.name,
-                        phoneNumber: updatedData.phoneNumber,
-                        whatsappNumber: updatedData.whatsappNumber,
-                        email: updatedData.email,
-                        address: updatedData.address,
-                        currentFacility: updatedData.facility, // Mapped to Schema Field
-                        licenseNumber: updatedData.licenseNumber,
-                        yearsOfExperience: parseInt(updatedData.yearsOfExperience) || 0, // Ensure Int
-                        specialization: updatedData.category || updatedData.role, // Map category to specialization too
-                        // role is usually immutable or separate, but we can sync it if needed
-                        avatarUrl: updatedData.avatarUrl
-                    }
+                    item: payload
                 })
             });
 
-            // 2. Update Extended Profile Data via savePatientProfile
-            const profileUpdates = {
-                ...updatedData.profile,
-                age: updatedData.age,
-                sex: updatedData.sex,
-                gender: updatedData.sex, // Sync both
-                address: updatedData.address,
-                medicalHistory: updatedData.medicalHistory
-            };
+            if (!res.ok) throw new Error("Failed to save patient profile");
 
-            await savePatientProfile(updatedData.id, profileUpdates);
-
-            // 3. Optimistic UI Update (Immediate)
+            // 2. Update Local State for Immediate UI Feedback
             setDbUsers(prevUsers => prevUsers.map(u => {
                 if (u.id === updatedData.id) {
-                    return { ...u, ...updatedData, profile: { ...u.profile, ...profileUpdates } };
+                    return {
+                        ...u,
+                        ...payload,
+                        profile: { ...u.profile, ...payload }
+                    };
                 }
                 return u;
             }));
 
-            // 4. Background Refresh
-            fetchUsers();
+            // 3. Close Modal & Refresh
             setEditingPatient(null);
-            alert("Patient details updated successfully!");
+            setTimeout(fetchUsers, 500);
+            alert("Patient details and medical history updated successfully!");
         } catch (error) {
             console.error("Failed to update patient", error);
-            alert("Failed to update patient. Please try again.");
+            alert("Failed to update patient: " + error.message);
         }
     };
 
@@ -501,23 +612,34 @@ export default function AdminDashboard({ user }) {
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', color: 'white',
                                 boxShadow: '0 10px 15px -3px rgba(30, 58, 138, 0.3)'
                             }}>
-                                🏥
+                                <img src="/logo_new.jpg" alt="Logo" style={{ width: '40px', height: '40px' }} />
                             </div>
                             <div>
-                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: colors.text }}>Admin Panel</h1>
+                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: colors.text }}>CareOnClick Admin Portal</h1>
                                 <p style={{ margin: '4px 0 0 0', color: colors.textLight }}>Hospital Control Center</p>
                             </div>
                         </div>
 
-                        <button
-                            onClick={exportData}
-                            style={{
-                                padding: '12px 24px', background: '#ecfccb', color: '#365314', border: '1px solid #d9f99d',
-                                borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-                            }}
-                        >
-                            📥 Export Data
-                        </button>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => setActiveTab('security')}
+                                style={{
+                                    padding: '12px 24px', background: '#f8fafc', color: '#1e293b', border: '1px solid #e2e8f0',
+                                    borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                                }}
+                            >
+                                🔒 Change Password
+                            </button>
+                            <button
+                                onClick={exportData}
+                                style={{
+                                    padding: '12px 24px', background: '#ecfccb', color: '#365314', border: '1px solid #d9f99d',
+                                    borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                                }}
+                            >
+                                📥 Export Data
+                            </button>
+                        </div>
                     </div>
 
                     {/* --- TABS --- */}
@@ -526,6 +648,7 @@ export default function AdminDashboard({ user }) {
                             padding: '12px', borderRadius: '12px', border: 'none', background: activeTab === 'overview' ? colors.primary : colors.white,
                             color: activeTab === 'overview' ? 'white' : colors.textLight, cursor: 'pointer', boxShadow: 'inset 0 0 0 1px ' + colors.border
                         }}>📊</button>
+                        <TabButton id="security" label="Security" icon="🔒" />
                         <TabButton id="analytics" label="Analytics" icon="📈" />
                         <TabButton id="patients" label="Patients" icon="👥" />
                         <TabButton id="appointments" label="Bookings" icon="📅" />
@@ -535,6 +658,7 @@ export default function AdminDashboard({ user }) {
                         <TabButton id="emails" label="Logs" icon="📨" />
                         <TabButton id="communication" label="Communication" icon="💬" />
                         <TabButton id="mailbox" label="Inbox" icon="📥" />
+                        <TabButton id="alerts" label="Alerts" icon="🔔" />
                         <TabButton id="site-editor" label="Site" icon="⚙️" />
                     </div>
                 </div>
@@ -552,7 +676,24 @@ export default function AdminDashboard({ user }) {
                         </div>
 
                         {/* HUGE CARDS ROW */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '32px', marginBottom: '48px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px', marginBottom: '48px' }}>
+
+                            {/* Card 0: Security (New for visibility) */}
+                            <div
+                                onClick={() => setActiveTab('security')}
+                                style={{
+                                    ...largeCardStyle,
+                                    background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                                    border: '1px solid #fed7aa', color: '#9a3412',
+                                    flex: 1
+                                }}
+                            >
+                                <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', opacity: 0.8 }}>Admin Security</h3>
+                                <div style={{ fontSize: '3rem', margin: '16px 0' }}>🔐</div>
+                                <div style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.8)', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                    CHANGE PASSWORD →
+                                </div>
+                            </div>
 
                             {/* Card 1: Patients */}
                             <div
@@ -629,7 +770,7 @@ export default function AdminDashboard({ user }) {
                                         <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{new Date(log.timestamp).toLocaleString()}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.action || 'ACCESS'}</td>
-                                            <td style={tdStyle}>{log.user || 'System'}</td>
+                                            <td style={tdStyle}>{log.actorName || log.user || 'System'}</td>
                                             <td style={tdStyle}>{log.details}</td>
                                         </tr>
                                     ))}
@@ -679,13 +820,26 @@ export default function AdminDashboard({ user }) {
                                                 <td style={tdStyle}>
                                                     <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{u.name}</div>
                                                     <div style={{ color: colors.textLight }}>{u.email}</div>
-                                                    <div
-                                                        onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
-                                                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.text, fontSize: '0.9rem' }}
-                                                        title="Send Official Mail"
-                                                    >
-                                                        <span>📧</span>
-                                                        <span style={{ textDecoration: 'underline', color: colors.primary }}>{u.email}</span>
+                                                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                                                        <div
+                                                            onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
+                                                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.text, fontSize: '0.9rem' }}
+                                                            title="Send Official Mail"
+                                                        >
+                                                            <span>📧</span>
+                                                            <span style={{ textDecoration: 'underline', color: colors.primary }}>Email</span>
+                                                        </div>
+                                                        <div
+                                                            onClick={() => {
+                                                                setSelectedChatTarget(u.id);
+                                                                setActiveTab('communication');
+                                                            }}
+                                                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.primary, fontSize: '0.9rem', fontWeight: 'bold' }}
+                                                            title="Chat Internally"
+                                                        >
+                                                            <span>💬</span>
+                                                            <span style={{ textDecoration: 'underline' }}>Chat</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td style={tdStyle}>
@@ -712,9 +866,15 @@ export default function AdminDashboard({ user }) {
                                                     </button>
                                                     <button
                                                         onClick={() => setEditingPatient({ ...u, ...u.profile, id: u.id })} // Spread profile to top level for easier editing
-                                                        style={{ color: colors.textLight, fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer' }}
+                                                        style={{ color: colors.textLight, fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer', marginRight: '16px' }}
                                                     >
                                                         Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteUser(u.id, 'Patient')}
+                                                        style={{ color: '#dc2626', fontWeight: 'bold', background: '#fee2e2', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}
+                                                    >
+                                                        Delete
                                                     </button>
                                                 </td>
                                             </tr>
@@ -760,7 +920,13 @@ export default function AdminDashboard({ user }) {
                                                 <div style={{ fontSize: '1.2rem', fontFamily: 'monospace', fontWeight: 'bold', color: colors.primary, marginBottom: '24px' }}>{patient.pathNumber || 'PENDING'}</div>
 
                                                 <div style={{ color: colors.textLight, fontSize: '0.9rem', uppercase: 'true', fontWeight: 'bold', marginBottom: '4px' }}>AGE / SEX</div>
-                                                <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>{p.age || 'N/A'} / {p.sex || p.gender || 'N/A'}</div>
+                                                <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>
+                                                    {(() => {
+                                                        const age = p.age || (p.dateOfBirth ? Math.floor((new Date() - new Date(p.dateOfBirth)) / 31557600000) : 'N/A');
+                                                        const sex = p.sex || p.gender || 'N/A';
+                                                        return `${age} / ${sex}`;
+                                                    })()}
+                                                </div>
 
                                                 <div style={{ color: colors.textLight, fontSize: '0.9rem', uppercase: 'true', fontWeight: 'bold', marginBottom: '4px' }}>ADDRESS</div>
                                                 <div style={{ fontSize: '1.2rem', marginBottom: '24px' }}>{p.address || 'N/A'}</div>
@@ -775,6 +941,67 @@ export default function AdminDashboard({ user }) {
                                                 </p>
                                             </div>
                                         )}
+
+                                        {/* CLINICAL RECORDS TIMELINE */}
+                                        <div style={{ marginTop: '40px', borderTop: '2px solid #f1f5f9', paddingTop: '32px' }}>
+                                            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '16px', color: colors.text }}>Clinical Records & Timeline</h3>
+
+                                            {(() => {
+                                                const patientRecords = records.filter(r => r.patientId === patient.id);
+                                                if (patientRecords.length === 0) {
+                                                    return <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', color: colors.textLight, fontStyle: 'italic' }}>No clinical records found for this patient.</div>;
+                                                }
+
+                                                return (
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                                        <thead>
+                                                            <tr style={{ background: '#f1f5f9' }}>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Date</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Type</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Summary / Result</th>
+                                                                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Provider</th>
+                                                                <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #e2e8f0', color: colors.textLight, fontSize: '0.8rem', uppercase: 'true' }}>Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {patientRecords.map(r => (
+                                                                <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                    <td style={{ padding: '12px', fontFamily: 'monospace', color: '#666' }}>
+                                                                        {new Date(r.date).toLocaleDateString()}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px' }}>
+                                                                        <span style={{
+                                                                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
+                                                                            background: r.unit === 'Prescription' ? '#fffbeb' : r.unit === 'Vitals' ? '#f0fdf4' : '#eff6ff',
+                                                                            color: r.unit === 'Prescription' ? '#b45309' : r.unit === 'Vitals' ? '#15803d' : '#1d4ed8'
+                                                                        }}>
+                                                                            {r.unit || 'Record'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', fontWeight: '500' }}>
+                                                                        {r.fileName || (r.structuredData ? JSON.parse(r.structuredData).testName : 'Record')}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', color: colors.textLight }}>
+                                                                        {r.professionalName || 'System'}
+                                                                    </td>
+                                                                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                                                                        <button
+                                                                            onClick={() => { setViewingPatientId(null); setViewingRecord(r); }}
+                                                                            style={{
+                                                                                padding: '6px 12px', borderRadius: '6px', border: `1px solid ${colors.border}`,
+                                                                                background: 'white', color: colors.primary, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem'
+                                                                            }}
+                                                                        >
+                                                                            View
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                );
+                                            })()}
+                                        </div>
 
                                         <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end' }}>
                                             <button
@@ -815,6 +1042,28 @@ export default function AdminDashboard({ user }) {
                                             <div>
                                                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', fontSize: '0.9rem' }}>WhatsApp Number</label>
                                                 <input value={editingPatient.whatsappNumber || ''} onChange={e => setEditingPatient({ ...editingPatient, whatsappNumber: e.target.value })} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc' }} />
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                                                    {editingPatient.avatarUrl ? (
+                                                        <img src={editingPatient.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>👤</div>
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleAvatarUpload(e, setEditingPatient, editingPatient)}
+                                                        style={{ display: 'block', marginBottom: '8px' }}
+                                                    />
+                                                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Max size 1MB. Base64 encoded.</p>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1060,13 +1309,26 @@ export default function AdminDashboard({ user }) {
                                                                 </div>
                                                             )}
 
-                                                            <div
-                                                                onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
-                                                                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}
-                                                                title="Send Official Mail"
-                                                            >
-                                                                <span>📧</span>
-                                                                <span style={{ textDecoration: 'underline', color: colors.primary }}>{u.email}</span>
+                                                            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                                                                <div
+                                                                    onClick={() => setEmailComposerData({ email: u.email, name: u.name })}
+                                                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.95rem' }}
+                                                                    title="Send Official Mail"
+                                                                >
+                                                                    <span>📧</span>
+                                                                    <span style={{ textDecoration: 'underline', color: colors.primary }}>Email</span>
+                                                                </div>
+                                                                <div
+                                                                    onClick={() => {
+                                                                        setSelectedChatTarget(u.id);
+                                                                        setActiveTab('communication');
+                                                                    }}
+                                                                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: colors.primary, fontSize: '0.95rem', fontWeight: 'bold' }}
+                                                                    title="Chat Internally"
+                                                                >
+                                                                    <span>💬</span>
+                                                                    <span style={{ textDecoration: 'underline' }}>Chat</span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1099,6 +1361,13 @@ export default function AdminDashboard({ user }) {
                                                         <div style={{ background: '#dcfce7', color: '#15803d', padding: '6px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.8rem', textAlign: 'center', textTransform: 'uppercase' }}>Verified</div>
                                                         : <button onClick={() => updateUserStatus(u.email, 'Verified').then(fetchUsers)} style={{ background: '#22c55e', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Verify</button>
                                                     }
+                                                    <button
+                                                        onClick={() => handleDeleteUser(u.id, u.role || 'Staff')}
+                                                        style={{ padding: '8px 24px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#dc2626' }}
+                                                    >
+                                                        Delete
+                                                    </button>
+
                                                 </div>
                                             </div>
                                         ))}
@@ -1117,6 +1386,29 @@ export default function AdminDashboard({ user }) {
                             <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '32px' }}>Edit Staff Profile</h2>
 
                             <form onSubmit={(e) => { e.preventDefault(); handleSaveProfessional(editingProfessional); }}>
+                                {/* Avatar */}
+                                <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
+                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Profile Picture</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fff', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                                            {editingProfessional.avatarUrl ? (
+                                                <img src={editingProfessional.avatarUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>👤</div>
+                                            )}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleAvatarUpload(e, setEditingProfessional, editingProfessional)}
+                                                style={{ display: 'block', marginBottom: '8px' }}
+                                            />
+                                            <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Max size 1MB. Base64 encoded.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Basic Info */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                                     <div>
@@ -1367,7 +1659,8 @@ export default function AdminDashboard({ user }) {
                                         result: formData.get('result'),
                                         unit: formData.get('unit'),
                                         range: formData.get('range'),
-                                        flag: formData.get('flag')
+                                        flag: formData.get('flag'),
+                                        comments: formData.get('comments')
                                     })
                                 };
                                 handleSaveRecord(newRecord);
@@ -1460,6 +1753,11 @@ export default function AdminDashboard({ user }) {
                                             )}
 
                                             <div>
+                                                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Professional Comments / Recommendations</label>
+                                                <textarea name="comments" defaultValue={JSON.parse(editingRecord.structuredData || '{}').comments} placeholder="Enter professional advice or recommendations..." rows="3" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', fontFamily: 'inherit' }} />
+                                            </div>
+
+                                            <div>
                                                 <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Attachment URL (Optional)</label>
                                                 <input name="fileUrl" defaultValue={editingRecord.fileUrl} placeholder="https://..." style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc' }} />
                                             </div>
@@ -1479,11 +1777,11 @@ export default function AdminDashboard({ user }) {
                 {/* VIEW RECORD MODAL (Request #6: Download/Print) */}
                 {viewingRecord && (
                     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}>
-                        <div style={{ background: 'white', padding: '0', borderRadius: '16px', width: '700px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                        <div id="print-area" style={{ background: 'white', padding: '0', borderRadius: '16px', width: '700px', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ padding: '32px', background: 'white' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '32px', borderBottom: '2px solid #000', paddingBottom: '24px' }}>
                                     <div>
-                                        <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>DR KAL'S VIRTUAL HOSPITAL</h1>
+                                        <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>CAREONCLICK</h1>
                                         <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '4px' }}>Official Medical Record</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
@@ -1495,10 +1793,23 @@ export default function AdminDashboard({ user }) {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginBottom: '32px' }}>
                                     <div>
                                         <div style={{ fontWeight: 'bold', color: '#666', fontSize: '0.85rem' }}>PATIENT</div>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{viewingRecord.patientName}</div>
-                                        <div>ID: {dbUsers.find(u => u.name === viewingRecord.patientName)?.pathNumber || 'N/A'}</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{(() => {
+                                            const resolvedName = (dbUsers.find(u => u.id === viewingRecord.patientId)?.name);
+                                            return resolvedName || viewingRecord.patientName || 'Unknown Patient';
+                                        })()}</div>
+                                        {(() => {
+                                            const patient = dbUsers.find(u => u.name === viewingRecord.patientName || u.id === viewingRecord.patientId);
+                                            const pProfile = patient?.profile || {};
+                                            const age = pProfile.age || (pProfile.dateOfBirth ? Math.floor((new Date() - new Date(pProfile.dateOfBirth)) / 31557600000) : 'N/A');
+                                            const sex = pProfile.sex || pProfile.gender || 'N/A';
+                                            return (
+                                                <div style={{ fontSize: '0.9rem', color: '#444' }}>
+                                                    ID: {patient?.pathNumber || 'N/A'} | {age} | {sex}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
-                                    <div>
+                                    <div style={{ textAlign: 'right' }}>
                                         <div style={{ fontWeight: 'bold', color: '#666', fontSize: '0.85rem' }}>PROVIDER</div>
                                         <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{viewingRecord.professionalName}</div>
                                         <div>{viewingRecord.facility || 'Main Hospital'}</div>
@@ -1530,37 +1841,72 @@ export default function AdminDashboard({ user }) {
                                             </div>
                                         </div>
                                     ) : (
-                                        <>
-                                            <div style={{ fontSize: '1.1rem', marginBottom: '16px', fontWeight: '500' }}>{viewingRecord.fileName}</div>
-                                            {(viewingRecord.structuredData) && (() => {
+                                        <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: '1.2rem', marginBottom: '16px', fontWeight: 'bold', color: colors.text }}>{viewingRecord.fileName || 'Clinical Detail'}</div>
+
+                                            {(() => {
                                                 try {
-                                                    const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : viewingRecord.structuredData;
+                                                    const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : (viewingRecord.structuredData || viewingRecord.structuredResults);
+                                                    if (!s) return <p style={{ color: '#666', fontStyle: 'italic' }}>No structured data available for this record.</p>;
+
+                                                    // Case 1: Clinical Note with nested results
+                                                    if (s.results || (s.testName && typeof s.testName === 'string' && s.testName.includes('Clinical'))) {
+                                                        const results = s.results || s;
+                                                        return (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                                {Object.entries(results).map(([key, val]) => {
+                                                                    if (key === 'testName' || typeof val === 'object') return null;
+                                                                    return (
+                                                                        <div key={key}>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>{key.replace(/([A-Z])/g, ' $1')}</div>
+                                                                            <div style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{String(val)}</div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    // Case 2: Standard Lab Result / Prescription
                                                     return (
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px' }}>
-                                                            <thead style={{ background: '#f8fafc' }}>
-                                                                <tr>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Test</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Result</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Units</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Ref. Range</th>
-                                                                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Flag</th>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                            <thead>
+                                                                <tr style={{ textAlign: 'left', borderBottom: '2px solid #e2e8f0' }}>
+                                                                    <th style={{ padding: '12px', color: '#64748b', fontSize: '0.8rem' }}>FIELD</th>
+                                                                    <th style={{ padding: '12px', color: '#64748b', fontSize: '0.8rem' }}>RESULT</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                <tr>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.testName || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>{s.result || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.unit || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee' }}>{s.range || '-'}</td>
-                                                                    <td style={{ padding: '8px', borderBottom: '1px solid #eee', color: s.flag === 'High' ? 'red' : s.flag === 'Low' ? 'orange' : 'green', fontWeight: 'bold' }}>{s.flag || 'Normal'}</td>
-                                                                </tr>
+                                                                {Object.entries(s).map(([key, val]) => (
+                                                                    <tr key={key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                        <td style={{ padding: '12px', fontWeight: 'bold', fontSize: '0.85rem', textTransform: 'uppercase' }}>{key}</td>
+                                                                        <td style={{ padding: '12px' }}>{String(val)}</td>
+                                                                    </tr>
+                                                                ))}
                                                             </tbody>
                                                         </table>
-                                                    )
-                                                } catch (e) { return null; }
+                                                    );
+                                                } catch (e) {
+                                                    return <p>{viewingRecord.fileName || 'General Medical Record'}</p>;
+                                                }
                                             })()}
-                                        </>
+                                        </div>
                                     )}
+
+                                    {(() => {
+                                        try {
+                                            const s = typeof viewingRecord.structuredData === 'string' ? JSON.parse(viewingRecord.structuredData) : (viewingRecord.structuredData || viewingRecord.structuredResults);
+                                            if (s && (s.comments || s.notes || s.plan)) {
+                                                return (
+                                                    <div style={{ marginTop: '24px', padding: '20px', background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a' }}>
+                                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: '#92400e', fontWeight: 'bold', textTransform: 'uppercase' }}>Professional Comments & Recommendations</h4>
+                                                        <p style={{ margin: 0, lineHeight: 1.6, color: '#92400e', whiteSpace: 'pre-wrap' }}>{s.comments || s.notes || s.plan}</p>
+                                                    </div>
+                                                );
+                                            }
+                                        } catch (e) { }
+                                        return null;
+                                    })()}
                                 </div>
 
                                 {viewingRecord.fileUrl && (
@@ -1572,10 +1918,34 @@ export default function AdminDashboard({ user }) {
                                     </div>
                                 )}
 
-                                <div style={{ borderTop: '2px solid #eee', paddingTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <div className="no-print" style={{ borderTop: '2px solid #eee', paddingTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                                     <button onClick={() => setViewingRecord(null)} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', fontWeight: 'bold', cursor: 'pointer' }}>Close</button>
                                     <button onClick={() => window.print()} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#333', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}>🖨️ Print / Download PDF</button>
                                 </div>
+
+                                <style dangerouslySetInnerHTML={{
+                                    __html: `
+                                    @media print {
+                                        body * { visibility: hidden; }
+                                        .no-print { display: none !important; }
+                                        #print-area, #print-area * { visibility: visible; }
+                                        #print-area {
+                                            position: fixed;
+                                            left: 0;
+                                            top: 0;
+                                            width: 100%;
+                                            height: 100%;
+                                            background: white !important;
+                                            padding: 40px !important;
+                                            margin: 0 !important;
+                                            box-shadow: none !important;
+                                            overflow: visible !important;
+                                        }
+                                        table { border-collapse: collapse !important; width: 100% !important; }
+                                        th, td { border: 1px solid #ddd !important; padding: 12px !important; }
+                                        @page { size: auto; margin: 20mm; }
+                                    }
+                                `}} />
                             </div>
                         </div>
                     </div>
@@ -1719,7 +2089,27 @@ export default function AdminDashboard({ user }) {
                 {/* COMMUNICATION TAB */}
                 {(activeTab === 'communication') && (
                     <div style={cardStyle}>
-                        <CommunicationHub user={user} patients={dbUsers.filter(u => u.role === 'patient')} staff={allStaff} />
+                        <CommunicationHub
+                            user={user}
+                            patients={dbUsers.filter(u => u.role === 'patient')}
+                            staff={allStaff}
+                            initialPatientId={selectedChatTarget}
+                        />
+                    </div>
+                )}
+
+                {/* ALERTS TAB */}
+                {activeTab === 'alerts' && (
+                    <div className="animate-fade-in">
+                        <AlertsView
+                            userName={user.name}
+                            role={user.role}
+                            userId={user.id}
+                            onReply={(targetId) => {
+                                setSelectedChatTarget(targetId);
+                                setActiveTab('communication');
+                            }}
+                        />
                     </div>
                 )}
 
@@ -2200,6 +2590,135 @@ export default function AdminDashboard({ user }) {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* SECURITY TAB */}
+                {activeTab === 'security' && (
+                    <div className="animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                        <div style={cardStyle}>
+                            <div style={{ marginBottom: '32px' }}>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: colors.text, marginBottom: '8px' }}>Security & Account</h2>
+                                <p style={{ color: colors.textLight }}>Manage your login credentials and account security.</p>
+                            </div>
+
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (passwords.new !== passwords.confirm) {
+                                    setPassStatus({ type: 'error', message: 'New passwords do not match' });
+                                    return;
+                                }
+                                if (passwords.new.length < 6) {
+                                    setPassStatus({ type: 'error', message: 'Password must be at least 6 characters' });
+                                    return;
+                                }
+
+                                setPassLoading(true);
+                                setPassStatus({ type: '', message: '' });
+
+                                try {
+                                    const res = await fetch('/api/user/change-password', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            currentPassword: passwords.current,
+                                            newPassword: passwords.new
+                                        })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        setPassStatus({ type: 'success', message: 'Password updated successfully!' });
+                                        setPasswords({ current: '', new: '', confirm: '' });
+                                    } else {
+                                        setPassStatus({ type: 'error', message: data.error || 'Failed to update password' });
+                                    }
+                                } catch (err) {
+                                    setPassStatus({ type: 'error', message: 'Network error. Please try again.' });
+                                } finally {
+                                    setPassLoading(false);
+                                }
+                            }}>
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>Current Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.current}
+                                        onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.new}
+                                        onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                <div style={{ marginBottom: '32px' }}>
+                                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: colors.text }}>Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwords.confirm}
+                                        onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: `1px solid ${colors.border}`, fontSize: '1rem' }}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+
+                                {passStatus.message && (
+                                    <div style={{
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        marginBottom: '24px',
+                                        background: passStatus.type === 'success' ? '#dcfce7' : '#fee2e2',
+                                        color: passStatus.type === 'success' ? '#166534' : '#991b1b',
+                                        fontWeight: 'bold',
+                                        textAlign: 'center'
+                                    }}>
+                                        {passStatus.type === 'success' ? '✅ ' : '❌ '}
+                                        {passStatus.message}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={passLoading}
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: colors.primary,
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '1rem',
+                                        cursor: passLoading ? 'not-allowed' : 'pointer',
+                                        opacity: passLoading ? 0.7 : 1,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {passLoading ? 'Updating...' : 'Update Password'}
+                                </button>
+                            </form>
+                        </div>
+
+                        <div style={{ ...cardStyle, marginTop: '24px', background: '#fffbeb', border: '1px solid #fde68a' }}>
+                            <h4 style={{ margin: '0 0 12px 0', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>⚠️</span> Security Tip
+                            </h4>
+                            <p style={{ margin: 0, color: '#92400e', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                                Encryption keys and system secrets are managed via environment variables. Changing your UI password only updates your login credentials.
+                            </p>
+                        </div>
                     </div>
                 )}
             </main>
