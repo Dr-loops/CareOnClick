@@ -1,0 +1,63 @@
+﻿b62bac9 fix: EMERGENCY RECOVERY - Restored CareOnClick homepage, branding, and advanced components from clone
+3ad20b6 merge: unify main with master and resolve conflicts for Vercel deployment
+004a620 fix: restore missing VideoMethodModal and use unified startCall across all dashboards
+757d2ff feat: upgrade video consultation system to use unified VideoCallService (Meet/WhatsApp)
+2d0a326 fix(audit): force 2026 timestamp for all audit logs (login, logout, appt, msg, records)
+02b5279 fix(api): force 2026 timestamp for audit logs to match simulation environment
+1506fe1 fix(dashboard): remove reverse() to show newest audit logs first
+5d072ca fix(api): force dynamic rendering for db route to prevent caching
+2bf070a fix(api): order audit logs by newest first
+e1f66ee chore(ci): resolve NEON_PROJECT_ID context warning in workflow
+3f72011 fix(dashboard): fix audit log visibility by fetching from API instead of local storage
+49b8eba feat: Implement comprehensive audit logging for auth, appointments, messages, and records
+0f340e3 WIP on main: e9cac7b Trigger Vercel deployment for care-on-click-frontend
+0bf753a index on main: e9cac7b Trigger Vercel deployment for care-on-click-frontend
+e9cac7b Trigger Vercel deployment for care-on-click-frontend
+274268b Fix: Patient Dashboard analyzableCategories error, Activity Log visibility, and Email Unique Constraint handling
+35d46a8 Enhance Admin patient records with professional comments, profile data fixes, and print optimization
+a46fcdd Update Lab Scientist Dashboard: clear mock values, add comments, fix profile pic, and save draft
+a33a630 Updated Data Policy and Terms to reflect clinical parity between Lab Doctors and Physicians
+ceb04e9 Updated Data Policy and Terms of Service to include all professionals and telehealth consent
+d91930e Implemented unified dashboard messaging and real-time notifications across all dashboards (Admin, Patient, Nurse, Professional)
+0a8f9c5 Implement full real-time WebRTC telehealth video call system with multi-peer support and global signaling
+a1a1843 feat: implement real-time audio-visual notifications across all dashboards
+eb0c50c fix: implement appointment alerts and real message deletion
+d903de8 feat: implement absolute live-link sync and fix admin login status
+3eedb57 feat: enhance admin record view, homepage professional card, security removals, and contact updates
+ae86c57 feat: Add Region Dropdown to ProfileModal
+62e3f18 feat: Enhanced audit logging for professional actions
+171393e feat: Implement manual appointment approval and real-time alerts
+5b42cf1 Fix profile persistence and visibility for Patient and Admin dashboards
+c31dab9 Enhance Telehealth video call: mobile layout, controls, and reliability
+3036a1e Update DATABASE_URL and trigger deployment
+fd9f836 Update debug-view with DB check
+bbae782 Fix syntax error in debug-view/page.js and rename to .jsx
+9776682 chore: Add debug view page
+6e4836f chore: Add env debug route
+3fe37b9 fix: Restore login page syntax
+2eee7fa feat: Add password visibility toggle and fix registration form
+8f5c2a5 fix(deps): add missing dependencies for vercel build
+1fe391f feat(ui): implement responsive design and fix workflow config
+12d158f Rebrand to CareOnClick - Complete branding update with new logo and comprehensive changes across all components
+77db84c Implement clickable avatar and profile/password settings for Patient Dashboard
+38ac380 Rename Dr. Kal's Virtual Hospital to CareOnClick in notifications
+b2448ff Enhance security tab visibility in Admin Dashboard
+3ef4773 Add Neon branching workflow and implement Admin password change functionality
+bb0c0a2 Comprehensive Fix: Dependencies, Schema, and Cloud DB Setup
+9b16f55 Add Netlify configuration guide for login troubleshooting
+eb25c02 Enhance mobile responsiveness: Navbar scrolls with page on mobile
+c6190a9 Update footer contact info and add Privacy, Terms, and Contact pages
+c034980 Add Footer component with navigation links for mobile visibility
+79ff2fb Rebrand to CareOnClick with new logo and dashboard navigation
+e09c209 Fix: Authentication, ID Login, and Navbar Interference
+6ea998c Docs: Add Vercel deployment guide
+bcdd54b Fix: Configure Prisma for PostgreSQL and add Vercel deployment scripts
+29dc138 Fix: Global password reset to 'password' and auth cleanup
+956787d Fix: Add auth secret and trustHost to NextAuth config
+7f0f706 Fix: Remove tracked build artifacts and database files
+25b3fdf first push
+c5fe5ba Update schema.prisma
+8ccc8c1 new database for my hspital
+221ebef feat: Add CommunicationHub and BillingInvoiceModal components, `useClinicalData` hook, and new API routes for vitals and user profiles.
+43bc605 DR KALS VIRTUAL HOSPITAL
+e9c0cd7 DR KALS VIRTUAL HOSPITAL

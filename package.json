@@ -1,13 +1,12 @@
 {
-    "name": "frontend",
-    "version": "0.1.0",
+    "name": "dr-kals-virtual-hospital",
+    "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "next dev",
+        "dev": "node server.js",
         "build": "prisma generate && next build",
-        "start": "next start",
-        "lint": "next lint",
-        "postinstall": "prisma generate"
+        "start": "node server.js",
+        "lint": "next lint"
     },
     "dependencies": {
         "@fullcalendar/core": "^6.1.20",
@@ -34,6 +33,7 @@
         "react-dom": "^19.0.0",
         "react-paystack": "^6.0.0",
         "recharts": "^2.15.0",
+        "socket.io": "^4.8.3",
         "socket.io-client": "^4.8.3",
         "swr": "^2.3.8",
         "twilio": "^5.12.0",

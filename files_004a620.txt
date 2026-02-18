@@ -1,0 +1,7 @@
+﻿backend/scripts/debug-user.js
+backend/scripts/reset-local-admin.js
+backend/user_list.json
+frontend/components/CommunicationHub.js
+frontend/components/PharmacyDashboard.js
+frontend/components/ProfessionalDashboard.js
+frontend/lib/videoService.js

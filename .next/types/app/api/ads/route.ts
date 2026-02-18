@@ -1,4 +1,4 @@
-// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital_clone\frontend\app\api\ads\route.js
+// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\app\api\ads\route.js
 import * as entry from '../../../../../app/api/ads/route.js'
 import type { NextRequest } from 'next/server.js'
 

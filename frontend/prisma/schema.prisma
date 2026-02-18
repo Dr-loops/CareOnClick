@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String          @id @default(cuid())
+  email                      String          @unique
+  password                   String
+  name                       String
+  role                       String
+  pathNumber                 String?         @unique
+  verificationStatus         String          @default("Pending")
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  licenseNumber              String?
+  yearsOfExperience          Int?
+  currentFacility            String?
+  facilityType               String?
+  country                    String?
+  region                     String?
+  address                    String?
+  phoneNumber                String?
+  whatsappNumber             String?
+  avatarUrl                  String?
+  bio                        String?
+  specialization             String?
+  appointmentsAsPatient      Appointment[]   @relation("PatientAppointments")
+  appointmentsAsProfessional Appointment[]   @relation("ProfessionalAppointments")
+  sentMessages               Message[]       @relation("SentMessages")
+  notifications              Notification[]
+  profile                    PatientProfile?
+  Task                       Task[]
+  VitalSign                  VitalSign[]
+}
+
+model PatientProfile {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  dateOfBirth        DateTime?
+  gender             String?
+  address            String?
+  phoneNumber        String?
+  region             String?
+  allergies          String?
+  medicalHistory     String?
+  currentMedications String?
+  currentRoom        String?
+  admissionStatus    String?
+  conditionStatus    String?
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Appointment {
+  id                   String   @id @default(cuid())
+  patientId            String
+  patientName          String
+  professionalId       String
+  professionalName     String
+  professionalCategory String
+  date                 DateTime
+  time                 String
+  type                 String
+  reason               String?
+  status               String   @default("Upcoming")
+  paymentStatus        String   @default("Pending")
+  amountPaid           Float    @default(0)
+  balanceDue           Float    @default(0)
+  paymentMethod        String?
+  channelName          String?
+  videoToken           String?
+  createdAt            DateTime @default(now())
+  patient              User     @relation("PatientAppointments", fields: [patientId], references: [id])
+  professional         User     @relation("ProfessionalAppointments", fields: [professionalId], references: [id])
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  senderId      String
+  senderName    String
+  role          String
+  recipientId   String?
+  recipientName String?
+  type          String   @default("CHAT")
+  content       String
+  attachment    String?
+  timestamp     DateTime @default(now())
+  sender        User     @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  status    String   @default("Unread")
+  metadata  String?
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  actorId   String
+  actorName String
+  target    String?
+  details   String?
+  timestamp DateTime @default(now())
+}
+
+model MedicalRecord {
+  id               String   @id @default(cuid())
+  patientId        String
+  patientName      String?
+  professionalId   String
+  professionalName String
+  professionalRole String
+  date             String
+  time             String
+  fileName         String
+  fileType         String?
+  fileUrl          String?
+  unit             String?
+  structuredData   String?
+  createdAt        DateTime @default(now())
+}
+
+model Ad {
+  id        String    @id @default(cuid())
+  title     String
+  type      String
+  url       String
+  link      String?
+  active    Boolean   @default(true)
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  priority  Int       @default(0)
+  createdAt DateTime  @default(now())
+}
+
+model NewsItem {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String
+  content     String
+  imageUrl    String?
+  category    String?
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model VitalSign {
+  id              String   @id @default(cuid())
+  patientId       String
+  temperature     Float
+  bloodPressure   String
+  heartRate       Int
+  spo2            Int
+  respiratoryRate Int?
+  recordedAt      DateTime @default(now())
+  recordedBy      String?
+  patient         User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id           String    @id @default(cuid())
+  patientId    String
+  patientName  String?
+  assignedToId String?
+  description  String
+  category     String
+  status       String    @default("Pending")
+  priority     String    @default("Normal")
+  dueDate      DateTime?
+  completedAt  DateTime?
+  completedBy  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  patient      User      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}

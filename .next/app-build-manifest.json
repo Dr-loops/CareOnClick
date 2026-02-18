@@ -51,10 +51,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/patients/route.js"
     ],
-    "/api/messages/route": [
+    "/api/admin/inbox/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/messages/route.js"
+      "static/chunks/app/api/admin/inbox/route.js"
     ]
   }
 }

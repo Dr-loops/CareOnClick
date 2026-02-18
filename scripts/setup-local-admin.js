@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function resetAdmin() {
     const adminEmail = 'drkalsvirtualhospital@gmail.com';
-    const newPassword = 'AdminPassword123!';
+    const newPassword = 'DrKal@Secure2026';
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     console.log(`Attempting to upsert admin user ${adminEmail}...`);

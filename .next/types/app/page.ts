@@ -1,4 +1,4 @@
-// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital_clone\frontend\app\page.js
+// File: C:\Users\kfryt\.gemini\antigravity\scratch\dr_kals_virtual_hospital\app\page.js
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
