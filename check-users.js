@@ -9,7 +9,7 @@ async function main() {
         console.log(`Found ${users.length} users.`);
         if (users.length > 0) {
             users.forEach(user => {
-                console.log(`- ${user.name} (${user.email}) - Role: ${user.role}`);
+                console.log(`- ${user.name} | ${user.email} | ID: ${user.id} | Status: ${user.verificationStatus} | Role: ${user.role}`);
             });
         }
     } catch (err) {

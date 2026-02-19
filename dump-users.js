@@ -3,9 +3,13 @@ const fs = require('fs');
 const prisma = new PrismaClient();
 
 async function main() {
-    const users = await prisma.user.findMany();
-    fs.writeFileSync('users_dump.json', JSON.stringify(users, null, 2));
-    console.log('Dumped users to users_dump.json');
+    try {
+        const users = await prisma.user.findMany();
+        fs.writeFileSync('users_dump.json', JSON.stringify(users, null, 2));
+        console.log(`Dumped ${users.length} users to users_dump.json`);
+    } catch (err) {
+        console.error('ERROR during dump:', err);
+    }
 }
 
 main().finally(() => prisma.$disconnect());
