@@ -7,6 +7,10 @@ import { useGlobalSync } from '@/lib/hooks/useGlobalSync';
 import AdminAnalytics from './AdminAnalytics';
 import CommunicationHub from './CommunicationHub';
 import EmailComposerModal from './EmailComposerModal';
+import VideoConsultation from './VideoConsultation';
+import VideoMethodModal from './VideoMethodModal';
+import { VideoCallService, VIDEO_METHODS } from '@/lib/videoService';
+import { getSocket } from '@/lib/socket';
 // Define colors locally as fallback
 const colors = {
     primary: '#0ea5e9', // Sky 500
@@ -154,6 +158,49 @@ export default function AdminDashboard({ user }) {
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [passLoading, setPassLoading] = useState(false);
     const [passStatus, setPassStatus] = useState({ type: '', message: '' });
+
+    // Video Consultation State
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [showVideoConsultation, setShowVideoConsultation] = useState(false);
+    const [selectedVideoTarget, setSelectedVideoTarget] = useState(null);
+
+    const handleSelectVideoMethod = async (method) => {
+        setIsVideoModalOpen(false);
+        if (!selectedVideoTarget) return;
+
+        if (method === VIDEO_METHODS.MEET) {
+            const link = await VideoCallService.startMeetSession();
+            window.open(link, '_blank');
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('send_message', {
+                    recipientId: selectedVideoTarget.id,
+                    senderId: user.id,
+                    senderName: user.name,
+                    content: `Hello ${selectedVideoTarget.name}, please join the secure Google Meet session: ${link}`,
+                    type: 'CHAT'
+                });
+            }
+        } else if (method === VIDEO_METHODS.WHATSAPP) {
+            const number = selectedVideoTarget.whatsappNumber || selectedVideoTarget.phoneNumber;
+            if (number) {
+                window.open(VideoCallService.getWhatsAppLink(number), '_blank');
+            } else {
+                alert("No WhatsApp number found for this user.");
+            }
+        } else {
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('call-invite', {
+                    to: selectedVideoTarget.id,
+                    from: user.id,
+                    name: user.name,
+                    roomId: user.id
+                });
+            }
+            setShowVideoConsultation(true);
+        }
+    };
 
     // Hooks
     useEffect(() => {
@@ -861,6 +908,12 @@ export default function AdminDashboard({ user }) {
                                                     <span style={{ padding: '4px 12px', borderRadius: '20px', background: '#dcfce7', color: '#15803d', fontWeight: 'bold', fontSize: '0.85rem' }}>Active</span>
                                                 </td>
                                                 <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                                    <button
+                                                        onClick={() => { setSelectedVideoTarget(u); setIsVideoModalOpen(true); }}
+                                                        style={{ color: colors.secondary, fontWeight: 'bold', marginRight: '16px', background: 'none', border: 'none', cursor: 'pointer' }}
+                                                    >
+                                                        📹 Video Call
+                                                    </button>
                                                     <button onClick={() => setViewingPatientId(u.id)} style={{ color: colors.primary, fontWeight: 'bold', marginRight: '16px', background: 'none', border: 'none', cursor: 'pointer' }}>
                                                         View Details
                                                     </button>
@@ -1003,7 +1056,13 @@ export default function AdminDashboard({ user }) {
                                             })()}
                                         </div>
 
-                                        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end', gap: '16px' }}>
+                                            <button
+                                                onClick={() => { setSelectedVideoTarget(patient); setIsVideoModalOpen(true); }}
+                                                style={{ padding: '12px 32px', background: colors.secondary, color: 'white', borderRadius: '12px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                                            >
+                                                📹 Start Video Call
+                                            </button>
                                             <button
                                                 onClick={() => { setViewingPatientId(null); setEditingPatient({ ...patient, ...p, id: patient.id }); }}
                                                 style={{ padding: '12px 32px', background: colors.primary, color: 'white', borderRadius: '12px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
@@ -1178,6 +1237,7 @@ export default function AdminDashboard({ user }) {
                                             <th style={thStyle}>ROLE</th>
                                             <th style={thStyle}>STATUS</th>
                                             <th style={thStyle}>PAYMENT</th>
+                                            <th style={{ ...thStyle, textAlign: 'right' }}>ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1229,6 +1289,24 @@ export default function AdminDashboard({ user }) {
                                                         <td style={tdStyle}>
                                                             {isMultiple ? '-' : (
                                                                 first.amountPaid ? <span style={{ color: 'green', fontWeight: 'bold' }}>Paid</span> : <span style={{ color: '#ccc' }}>Pending</span>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                                            {!isMultiple && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const pUser = dbUsers.find(u => u.id === first.patientId);
+                                                                        if (pUser) {
+                                                                            setSelectedVideoTarget(pUser);
+                                                                            setIsVideoModalOpen(true);
+                                                                        } else {
+                                                                            alert("Patient profile not found.");
+                                                                        }
+                                                                    }}
+                                                                    style={{ padding: '6px 12px', background: colors.secondary, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                >
+                                                                    📹 Call Patient
+                                                                </button>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -1351,6 +1429,12 @@ export default function AdminDashboard({ user }) {
 
                                                 {/* 3. Actions */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                                                    <button
+                                                        onClick={() => { setSelectedVideoTarget(u); setIsVideoModalOpen(true); }}
+                                                        style={{ padding: '8px 24px', background: colors.secondary, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: 'white' }}
+                                                    >
+                                                        📹 Video Call
+                                                    </button>
                                                     <button
                                                         onClick={() => setEditingProfessional(u)}
                                                         style={{ padding: '8px 24px', background: 'white', border: `1px solid ${colors.border}`, borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#333' }}
@@ -2722,6 +2806,27 @@ export default function AdminDashboard({ user }) {
                     </div>
                 )}
             </main>
+
+            {/* GLOBAL VIDEO MODALS */}
+            {showVideoConsultation && selectedVideoTarget && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: 'black' }}>
+                    <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10000 }}>
+                        <button
+                            onClick={() => setShowVideoConsultation(false)}
+                            style={{ padding: '10px 24px', background: colors.danger, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                            End Session
+                        </button>
+                    </div>
+                    <VideoConsultation roomId={user.id} user={user} />
+                </div>
+            )}
+
+            <VideoMethodModal
+                isOpen={isVideoModalOpen}
+                onClose={() => setIsVideoModalOpen(false)}
+                onSelectMethod={handleSelectVideoMethod}
+            />
         </div>
     );
 }

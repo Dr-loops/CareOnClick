@@ -263,53 +263,43 @@ export default function CommunicationHub({
                             pointerEvents: selectedTarget ? 'auto' : 'none',
                             transition: 'opacity 0.3s'
                         }}>
-                            {/* WhatsApp */}
+                            {/* Unified Digital Consultation Center */}
                             <Card
-                                style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #22c55e', background: '#f0fdf4', transition: 'transform 0.2s' }}
-                                onClick={() => {
-                                    if (!selectedTarget) return;
-                                    const number = selectedTarget.whatsappNumber || selectedTarget.phoneNumber;
-                                    const cleanNumber = number.replace(/\D/g, '');
-                                    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Hello ${selectedTarget.name}, this is ${user.name} from CareOnClick.`)}`, '_blank');
+                                style={{
+                                    padding: '1.5rem',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    border: '2px solid #6366f1',
+                                    background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
                                 }}
+                                className="hover:scale-105 hover:shadow-xl group"
+                                onClick={() => setIsVideoModalOpen(true)}
                             >
-                                <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📱</div>
-                                <div style={{ fontWeight: 'bold', color: '#15803d' }}>WhatsApp Chat/Call</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Direct Link</div>
+                                <div style={{ marginBottom: '0.75rem', fontSize: '2.5rem', transition: 'transform 0.3s' }} className="group-hover:rotate-12">📹</div>
+                                <div style={{ fontWeight: '800', color: '#3730a3', fontSize: '1.1rem' }}>Digital Consultation Center</div>
+                                <div style={{ fontSize: '0.8rem', color: '#4338ca', marginTop: '0.25rem' }}>Meet • WhatsApp • Secure Video</div>
                             </Card>
 
-                            {/* Mobile Call */}
+                            {/* Mobile Call (Kept for voice only fallback) */}
                             <Card
-                                style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #3b82f6', background: '#eff6ff', transition: 'transform 0.2s' }}
+                                style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '1px solid #e2e8f0', background: '#f8fafc', transition: 'all 0.2s' }}
                                 onClick={() => selectedTarget && (window.location.href = `tel:${selectedTarget.phoneNumber}`)}
                             >
                                 <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📞</div>
-                                <div style={{ fontWeight: 'bold', color: '#1d4ed8' }}>Mobile Network Call</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Voice Call</div>
+                                <div style={{ fontWeight: 'bold', color: '#64748b' }}>Network Voice Call</div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Standard Line</div>
                             </Card>
 
-                            {/* Telehealth Room */}
-                            <Card
-                                style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #a855f7', background: '#f3e8ff', transition: 'transform 0.2s' }}
-                                onClick={() => {
-                                    setIsVideoModalOpen(true);
-                                }}
-                            >
-                                <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>🩺</div>
-                                <div style={{ fontWeight: 'bold', color: '#7e22ce' }}>Telehealth Video Room</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Secure Session</div>
-                            </Card>
-
-                            {/* Video Call */}
-                            <Card
-                                style={{ padding: '1.5rem', textAlign: 'center', cursor: 'pointer', border: '2px solid #f59e0b', background: '#fffbeb', transition: 'transform 0.2s' }}
-                                onClick={() => {
-                                    setIsVideoModalOpen(true);
-                                }}
-                            >
-                                <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>📹</div>
-                                <div style={{ fontWeight: 'bold', color: '#b45309' }}>Quick Video Call</div>
-                                <div style={{ fontSize: '0.75rem', color: '#666' }}>Instant Connection</div>
+                            {/* Dictation Card */}
+                            <Card style={{ padding: '1.5rem', textAlign: 'center', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                                <div style={{ marginBottom: '0.5rem', fontSize: '2rem' }}>🎤</div>
+                                <div style={{ fontWeight: 'bold', color: '#64748b', marginBottom: '0.5rem' }}>Dictation App</div>
+                                <DictationRecorder onTranscriptionComplete={(text) => {
+                                    const el = document.getElementById('comm-hub-msg-content');
+                                    if (el) el.value += `\n[Voice Note]: ${text}`;
+                                }} />
                             </Card>
 
                             {/* Voice Note */}
