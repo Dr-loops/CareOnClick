@@ -2,6 +2,5 @@
     "version": 2,
     "buildCommand": "prisma generate && next build",
     "installCommand": "npm install --legacy-peer-deps",
-    "framework": "nextjs",
-    "rootDirectory": "frontend"
+    "framework": "nextjs"
 }
