@@ -3,10 +3,11 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "node server.js",
-        "build": "prisma generate && next build",
-        "start": "node server.js",
-        "lint": "next lint"
+        "dev": "cd frontend && npm run dev",
+        "build": "cd frontend && npx prisma generate && next build",
+        "postinstall": "cd frontend && npm install --legacy-peer-deps",
+        "start": "cd frontend && npm start",
+        "lint": "cd frontend && npm run lint"
     },
     "dependencies": {
         "@fullcalendar/core": "^6.1.20",
