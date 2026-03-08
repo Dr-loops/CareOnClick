@@ -1551,8 +1551,15 @@ export default function PatientDashboard({ user }) {
                                                 </span>
                                                 <span className="text-gray-500 text-sm">{new Date(alertItem.displayTime).toLocaleString()}</span>
                                             </div>
-                                            <p style={{ fontSize: '1.1rem', color: alertItem.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0' }}>
-                                                {alertItem.displayMessage}
+                                            <p style={{ fontSize: '1.1rem', color: alertItem.type === 'ALERT' ? '#b91c1c' : '#334155', margin: '0.5rem 0', wordBreak: 'break-word' }}>
+                                                {(() => {
+                                                    const parts = alertItem.displayMessage.split(/(https?:\/\/[^\s]+)/g);
+                                                    return parts.map((part, i) => 
+                                                        part.match(/^https?:\/\//) ? 
+                                                            <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-sea-blue)', textDecoration: 'underline', fontWeight: 'bold' }}>{part}</a> 
+                                                            : part
+                                                    );
+                                                })()}
                                             </p>
 
                                             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>

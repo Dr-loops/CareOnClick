@@ -190,8 +190,27 @@ export default function AdminDashboard({ user }) {
             }
 
             // 2. Automated Notifications (Email/SMS)
+            if (!selectedVideoTarget.email && !selectedVideoTarget.phoneNumber) {
+                alert("Warning: This patient has no email or phone number on file. They will not receive a notification.");
+            }
+
             try {
-                await fetch('/api/notify', {
+                // Save to Database (Persists in Patient's Inbox)
+                await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recipientId: selectedVideoTarget.id,
+                        recipientName: selectedVideoTarget.name,
+                        content: `PLEASE JOIN VIDEO CONSULTATION: ${link}`,
+                        type: 'CHAT',
+                        senderName: user.name,
+                        role: user.role
+                    })
+                });
+
+                // Send External Notification (Email/SMS)
+                const res = await fetch('/api/notify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -204,7 +223,7 @@ export default function AdminDashboard({ user }) {
                                 <h2 style="color: #0ea5e9;">Video Consultation Invitation</h2>
                                 <p>Hello <strong>${selectedVideoTarget.name}</strong>,</p>
                                 <p>Your healthcare provider is ready to see you for your scheduled consultation.</p>
-                                <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; fontWeight: bold;">Join Google Meet Session</a>
+                                <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Join Google Meet Session</a>
                                 <p style="margin-top: 20px; font-size: 0.9rem; color: #64748b;">If the button doesn't work, copy this link: ${link}</p>
                             </div>
                         `
@@ -213,12 +232,14 @@ export default function AdminDashboard({ user }) {
                 
                 const notifyResult = await res.json();
                 if (notifyResult.success) {
-                    console.log(`[Video] Notification sent to ${selectedVideoTarget.email}`);
+                    alert(`✅ Meeting link sent to ${selectedVideoTarget.name} via email/SMS and added to their inbox.`);
                 } else {
-                    console.error(`[Video] Notification failed: ${notifyResult.error}`);
+                    console.error("[Video] Notification API failed", notifyResult);
+                    alert(`⚠️ Link generated, but notification failed: ${notifyResult.error || 'Unknown error'}`);
                 }
             } catch (e) {
                 console.error("Failed to send automated notifications:", e);
+                alert("⚠️ Link generated, but an error occurred while notifying the patient.");
             }
 
         } else if (method === VIDEO_METHODS.WHATSAPP) {
