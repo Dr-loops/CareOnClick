@@ -12,6 +12,7 @@ const loginSchema = z.object({
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
     ...authConfig,
+    basePath: '/api/auth',
     providers: [
         Credentials({
             async authorize(credentials) {
@@ -25,7 +26,9 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                         const trimmedInput = emailOrId.trim();
                         const lowerInput = trimmedInput.toLowerCase();
 
-                        console.log(`[AUTH] Attempting login for: "${emailOrId}"`);
+                        console.log(`[AUTH] Attempting login for: "${emailOrId}" (Length: ${emailOrId.length})`);
+                        console.log(`[AUTH] DEBUG: ENV DATABASE_URL starts with: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) : 'MISSING'}...`);
+                        console.log(`[AUTH] DEBUG: ENV AUTH_SECRET is ${process.env.AUTH_SECRET ? 'PRESENT' : 'MISSING'}`);
 
                         // Try finding user by Email (case insensitive) OR ID/Path (original)
                         const user = await prisma.user.findFirst({
@@ -40,11 +43,14 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                         });
 
                         if (!user) {
-                            console.log(`[AUTH] ❌ FAIL: User NOT FOUND for: "${emailOrId}" in DB: ${process.env.DATABASE_URL.substring(0, 30)}...`);
+                            console.log(`[AUTH] ❌ FAIL: User NOT FOUND for: "${emailOrId}"`);
+                            // Debug list existing emails (safely)
+                            const count = await prisma.user.count();
+                            console.log(`[AUTH] DEBUG: Current user count in DB: ${count}`);
                             return null;
                         }
 
-                        console.log(`[AUTH] 🔍 OK: User FOUND - ${user.email} (ID: ${user.id})`);
+                        console.log(`[AUTH] 🔍 OK: User FOUND - ${user.email} (ID: ${user.id}, Role: ${user.role}, Status: ${user.verificationStatus})`);
 
                         const passwordsMatch = await bcrypt.compare(password, user.password);
                         if (passwordsMatch) {
@@ -64,12 +70,33 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                     }
                 } catch (e) {
                     console.error("[AUTH] ‼️ FATAL ERROR in authorize:", e);
+                    throw e; // Bubble up for NextAuth to handle
                 }
                 return null;
             },
         }),
     ],
     session: { strategy: 'jwt' },
+    events: {
+        async signIn({ user }) {
+            const { logAction } = await import('@/lib/logger');
+            await logAction({
+                action: 'LOGIN',
+                actorId: user.id,
+                actorName: user.name || user.email,
+                details: `User logged in successfully from ${user.role} portal.`
+            });
+        },
+        async signOut({ token }) {
+            const { logAction } = await import('@/lib/logger');
+            await logAction({
+                action: 'LOGOUT',
+                actorId: token.sub,
+                actorName: token.email || token.name || 'User',
+                details: 'User logged out.'
+            });
+        },
+    },
     secret: process.env.AUTH_SECRET || "DrKalsSuperSecretKey2026_FALLBACK",
     trustHost: true,
     debug: true,

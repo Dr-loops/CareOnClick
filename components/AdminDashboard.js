@@ -167,8 +167,8 @@ export default function AdminDashboard({ user }) {
             const res = await fetch('/api/db');
             if (res.ok) {
                 const data = await res.json();
-                if (data.users && Array.isArray(data.users)) {
-                    const profiles = data.patient_profiles || [];
+                if (Array.isArray(data.users)) {
+                    const profiles = Array.isArray(data.patient_profiles) ? data.patient_profiles : [];
                     const mergedUsers = data.users.map(user => {
                         const profile = profiles.find(p => p.userId === user.id);
                         return { ...user, profile: profile || {} };
@@ -306,7 +306,7 @@ export default function AdminDashboard({ user }) {
             }));
     };
 
-    const allStaff = getAllStaff();
+    const allStaff = Array.isArray(dbUsers) ? getAllStaff() : [];
     const filteredStaff = allStaff.filter(u =>
         (u.name?.toLowerCase() || '').includes(registrationsSearch.toLowerCase()) ||
         (u.email?.toLowerCase() || '').includes(registrationsSearch.toLowerCase())
@@ -766,7 +766,7 @@ export default function AdminDashboard({ user }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {auditLogs.slice(0, 8).map((log, idx) => (
+                                    {(Array.isArray(auditLogs) ? auditLogs : []).slice(0, 8).map((log, idx) => (
                                         <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{new Date(log.timestamp).toLocaleString()}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.action || 'ACCESS'}</td>
@@ -812,7 +812,7 @@ export default function AdminDashboard({ user }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {dbUsers.filter(u => u.role === 'patient')
+                                    {(Array.isArray(dbUsers) ? dbUsers : []).filter(u => u.role === 'patient')
                                         .filter(u => (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
                                         .map(u => (
                                             <tr key={u.id}>

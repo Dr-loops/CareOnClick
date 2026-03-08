@@ -7,8 +7,8 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
-// Initialize Next.js
-const app = next({ dev, hostname, port });
+// Initialize Next.js pointing to the frontend directory
+const app = next({ dev, hostname, port, dir: './frontend' });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {

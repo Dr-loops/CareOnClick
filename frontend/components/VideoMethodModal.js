@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Video, Phone, X } from 'lucide-react';
 import { VideoCallService, VIDEO_METHODS } from '@/lib/videoService';
 
@@ -42,6 +42,19 @@ const VideoMethodModal = ({ isOpen, onClose, onSelectMethod }) => {
                         <div className="text-left">
                             <h4 className="font-bold text-slate-800">WhatsApp Video</h4>
                             <p className="text-sm text-slate-500">Quick and easy mobile connection</p>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => onSelectMethod(VIDEO_METHODS.PORTAL)}
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-slate-100 hover:border-amber-500 hover:bg-amber-50 transition-all group"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                            <Video size={24} />
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-slate-800">In-Portal Video (Beta)</h4>
+                            <p className="text-sm text-slate-500">Built-in telemedicine room</p>
                         </div>
                     </button>
                 </div>

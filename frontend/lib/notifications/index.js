@@ -33,6 +33,7 @@ class LocalAdapter {
         const line = `${timestamp} - ${message}\n`;
         try {
             await fs.promises.appendFile(LOG_FILE, line);
+            console.log(`[NOTIFY-LOG] ${message}`);
         } catch (e) {
             console.error("Failed to write to notification log", e);
         }

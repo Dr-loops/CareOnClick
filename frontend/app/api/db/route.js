@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+// Use a local client with a specific pool for this heavy route
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL + "&connection_limit=10",
+    },
+  },
+});
 import { encrypt, decrypt } from '@/lib/crypto';
 import { auth } from '@/auth';
+import { logAction } from '@/lib/logger';
 
 export async function GET() {
     try {
@@ -40,20 +49,45 @@ export async function GET() {
 
         const appointmentWhere = isPatient ? { patientId: user.id } : {};
         const recordWhere = isPatient ? { patientId: user.id } : {};
-
-        const [users, appointments, messages, notifications, activity_logs, patient_profiles, records, vitals] = await Promise.all([
-            prisma.user.findMany({ where: usersQuery }),
-            prisma.appointment.findMany({ where: appointmentWhere }),
-            prisma.message.findMany({ where: messageFilter }),
-            prisma.notification.findMany({ where: notificationFilter }),
-            prisma.auditLog.findMany({
+        console.log(`[TRACE-V2] [FRONTEND/API/DB] User Role: ${user.role}, ID: ${user.id}`);
+        let users = [], appointments = [], messages = [], notifications = [], activity_logs = [], patient_profiles = [], records = [], vitals = [];
+        try {
+            console.log(`[FRONTEND/API/DB] Starting SEQUENTIAL data fetch for ${user.role}...`);
+            
+            users = await prisma.user.findMany({ where: usersQuery });
+            console.log(`- Users: ${users.length}`);
+            
+            appointments = await prisma.appointment.findMany({ where: appointmentWhere });
+            console.log(`- Appointments: ${appointments.length}`);
+            
+            messages = await prisma.message.findMany({ where: messageFilter });
+            console.log(`- Messages: ${messages.length}`);
+            
+            notifications = await prisma.notification.findMany({ where: notificationFilter });
+            console.log(`- Notifications: ${notifications.length}`);
+            
+            activity_logs = await prisma.auditLog.findMany({
                 where: isPatient ? { actorId: user.id } : {},
-                take: 100
-            }),
-            prisma.patientProfile.findMany({ where: isPatient ? { userId: user.id } : {} }),
-            prisma.medicalRecord.findMany({ where: recordWhere }),
-            prisma.vitalSign.findMany({ where: recordWhere }),
-        ]);
+                orderBy: { timestamp: 'desc' },
+                take: 20
+            });
+            console.log(`- AuditLogs: ${activity_logs.length}`);
+            
+            patient_profiles = await prisma.patientProfile.findMany({ where: isPatient ? { userId: user.id } : {} });
+            records = await prisma.medicalRecord.findMany({ where: recordWhere });
+            vitals = await prisma.vitalSign.findMany({ where: recordWhere });
+            
+            console.log(`[FRONTEND/API/DB] Sequential fetch completed successfully.`);
+        } catch (dbError) {
+            console.error("[FRONTEND/API/DB] CRITICAL Database Fetch Error:", dbError);
+            return NextResponse.json({ 
+                error: 'Database fetch failed', 
+                message: dbError.message,
+                details: 'Please check connection limits or Prisma engine status.'
+            }, { status: 500 });
+        }
+
+        console.log(`[FRONTEND/API/DB] Fetched counts: users=${users.length}, appts=${appointments.length}, profiles=${patient_profiles.length}`);
 
         // Decrypt sensitive data for Patient Profiles
         const decryptedProfiles = patient_profiles.map(p => ({
@@ -97,7 +131,7 @@ export async function POST(request) {
         else if (collection === 'appointments') modelDelegate = prisma.appointment;
         else if (collection === 'messages') modelDelegate = prisma.message;
         else if (collection === 'notifications') modelDelegate = prisma.notification;
-        else if (collection === 'activity_logs') modelDelegate = prisma.auditLog;
+        else if (collection === 'activity_logs' || collection === 'audit_logs') modelDelegate = prisma.auditLog;
         else if (collection === 'patient_profiles') modelDelegate = prisma.patientProfile;
         else if (collection === 'records') modelDelegate = prisma.medicalRecord; // Mapped from 'records' to 'medicalRecord'
         else if (collection === 'vitals') modelDelegate = prisma.vitalSign; // Legacy Vitals table
@@ -179,6 +213,15 @@ export async function POST(request) {
                     console.error("Notification Logic Error", notifyErr);
                 }
             }
+
+            // Log the action
+            await logAction({
+                action: 'ADD_RECORD',
+                actorId: session.user.id,
+                actorName: session.user.name,
+                target: `${collection}:${newRecord.id}`,
+                details: `Added new item to ${collection}.`
+            });
 
         } else if (action === 'update' || action === 'save') {
             // Handle both email (legacy user ID) and UUIDs
@@ -294,6 +337,16 @@ export async function POST(request) {
                 ]);
 
                 console.log("Successfully updated User/Profile for:", user.email);
+
+                // Log the action
+                await logAction({
+                    action: 'UPDATE_PATIENT_PROFILE',
+                    actorId: session.user.id,
+                    actorName: session.user.name,
+                    target: `User:${user.id}`,
+                    details: `Updated profile for patient ${user.name}.`
+                });
+
                 return NextResponse.json({ success: true });
             }
 
@@ -318,6 +371,15 @@ export async function POST(request) {
                 // PatientProfile, Notification, VitalSign, Task have Cascade configured in Schema
             }
             await modelDelegate.delete({ where: { id } });
+
+            // Log the action
+            await logAction({
+                action: 'DELETE_RECORD',
+                actorId: session.user.id,
+                actorName: session.user.name,
+                target: `${collection}:${id}`,
+                details: `Deleted item from ${collection}.`
+            });
         }
 
         return NextResponse.json({ success: true });

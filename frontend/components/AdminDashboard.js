@@ -139,9 +139,11 @@ export default function AdminDashboard({ user }) {
     const [registrationsSearch, setRegistrationsSearch] = useState('');
     const [searchQuery, setSearchQuery] = useState(''); // Patient search
     const [viewingPatientId, setViewingPatientId] = useState(null);
-    const [editingPatient, setEditingPatient] = useState(null);
     const [editingProfessional, setEditingProfessional] = useState(null);
     const [logSortOrder, setLogSortOrder] = useState('newest');
+    const [logTimeFilter, setLogTimeFilter] = useState('all'); // all, today, week, month
+    const [logPage, setLogPage] = useState(1);
+    const logsPerPage = 50;
 
     // Records State
     const [records, setRecords] = useState([]);
@@ -168,9 +170,14 @@ export default function AdminDashboard({ user }) {
         setIsVideoModalOpen(false);
         if (!selectedVideoTarget) return;
 
+        console.log(`[Video] Selected method: ${method} for ${selectedVideoTarget.name}`);
+
         if (method === VIDEO_METHODS.MEET) {
-            const link = await VideoCallService.startMeetSession();
+            const attendees = selectedVideoTarget.email ? [selectedVideoTarget.email] : [];
+            const link = await VideoCallService.startMeetSession(attendees);
             window.open(link, '_blank');
+            
+            // 1. Send via Socket (Real-time Chat)
             const socket = getSocket();
             if (socket) {
                 socket.emit('send_message', {
@@ -181,6 +188,39 @@ export default function AdminDashboard({ user }) {
                     type: 'CHAT'
                 });
             }
+
+            // 2. Automated Notifications (Email/SMS)
+            try {
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: selectedVideoTarget.email,
+                        phoneNumber: selectedVideoTarget.phoneNumber,
+                        subject: "Urgent: Video Consultation Link - Dr. Kal's Virtual Hospital",
+                        text: `Hello ${selectedVideoTarget.name},\n\nDr. Kal (or staff) is starting a video consultation with you.\n\nPlease join here: ${link}\n\nThank you.`,
+                        html: `
+                            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+                                <h2 style="color: #0ea5e9;">Video Consultation Invitation</h2>
+                                <p>Hello <strong>${selectedVideoTarget.name}</strong>,</p>
+                                <p>Your healthcare provider is ready to see you for your scheduled consultation.</p>
+                                <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; fontWeight: bold;">Join Google Meet Session</a>
+                                <p style="margin-top: 20px; font-size: 0.9rem; color: #64748b;">If the button doesn't work, copy this link: ${link}</p>
+                            </div>
+                        `
+                    })
+                });
+                
+                const notifyResult = await res.json();
+                if (notifyResult.success) {
+                    console.log(`[Video] Notification sent to ${selectedVideoTarget.email}`);
+                } else {
+                    console.error(`[Video] Notification failed: ${notifyResult.error}`);
+                }
+            } catch (e) {
+                console.error("Failed to send automated notifications:", e);
+            }
+
         } else if (method === VIDEO_METHODS.WHATSAPP) {
             const number = selectedVideoTarget.whatsappNumber || selectedVideoTarget.phoneNumber;
             if (number) {
@@ -189,6 +229,7 @@ export default function AdminDashboard({ user }) {
                 alert("No WhatsApp number found for this user.");
             }
         } else {
+            // PORTAL / WEBRTC method
             const socket = getSocket();
             if (socket) {
                 socket.emit('call-invite', {
@@ -214,8 +255,8 @@ export default function AdminDashboard({ user }) {
             const res = await fetch('/api/db');
             if (res.ok) {
                 const data = await res.json();
-                if (data.users && Array.isArray(data.users)) {
-                    const profiles = data.patient_profiles || [];
+                if (Array.isArray(data.users)) {
+                    const profiles = Array.isArray(data.patient_profiles) ? data.patient_profiles : [];
                     const mergedUsers = data.users.map(user => {
                         const profile = profiles.find(p => p.userId === user.id);
                         return { ...user, profile: profile || {} };
@@ -250,6 +291,10 @@ export default function AdminDashboard({ user }) {
                         setRecords(allRecords);
                     }
                 }
+
+                if (Array.isArray(data.activity_logs)) {
+                    setAuditLogs(data.activity_logs);
+                }
             }
         } catch (error) {
             console.error("Failed to fetch users", error);
@@ -270,10 +315,17 @@ export default function AdminDashboard({ user }) {
         } catch (error) { console.error("Failed to fetch appointments", error); }
     };
 
-    const fetchAuditLogs = () => {
-        if (typeof window !== 'undefined') {
-            const logs = JSON.parse(localStorage.getItem('dr_kal_audit_logs') || '[]');
-            setAuditLogs(logs.reverse()); // Newest first
+    const fetchAuditLogs = async () => {
+        try {
+            const res = await fetch('/api/db');
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.activity_logs)) {
+                    setAuditLogs(data.activity_logs);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch audit logs", e);
         }
     };
 
@@ -282,7 +334,7 @@ export default function AdminDashboard({ user }) {
         try {
             const res = await fetch('/api/admin/inbox');
             const data = await res.json();
-            if (data.success) {
+            if (data.success && Array.isArray(data.emails)) {
                 setInboxEmails(data.emails);
             }
         } catch (e) {
@@ -813,7 +865,7 @@ export default function AdminDashboard({ user }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {auditLogs.slice(0, 8).map((log, idx) => (
+                                    {(Array.isArray(auditLogs) ? auditLogs : []).slice(0, 8).map((log, idx) => (
                                         <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{new Date(log.timestamp).toLocaleString()}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.action || 'ACCESS'}</td>
@@ -859,7 +911,7 @@ export default function AdminDashboard({ user }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {dbUsers.filter(u => u.role === 'patient')
+                                    {(Array.isArray(dbUsers) ? dbUsers : []).filter(u => u.role === 'patient')
                                         .filter(u => (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
                                         .map(u => (
                                             <tr key={u.id}>
@@ -2057,10 +2109,9 @@ export default function AdminDashboard({ user }) {
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button
                                     onClick={() => {
-                                        const logs = JSON.parse(localStorage.getItem('dr_kal_audit_logs') || '[]');
                                         const csv = [
-                                            ['Time', 'Actor', 'Action', 'Target', 'Details', 'Notes'],
-                                            ...logs.map(l => [l.timestamp, l.actorName, l.action, l.targetName, l.details, l.notes])
+                                            ['Time', 'Actor', 'Action', 'Target', 'Details'],
+                                            ...auditLogs.map(l => [l.timestamp, l.actorName, l.action, l.target || l.targetName || '', l.details])
                                         ].map(e => e.join(',')).join('\n');
                                         const blob = new Blob([csv], { type: 'text/csv' });
                                         const url = window.URL.createObjectURL(blob);
@@ -2075,16 +2126,12 @@ export default function AdminDashboard({ user }) {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        if (confirm('Are you sure? This will clear local audit logs.')) {
-                                            localStorage.removeItem('dr_kal_audit_logs');
-                                            // Force re-render
-                                            setActiveTab('overview');
-                                            setTimeout(() => setActiveTab('emails'), 50);
-                                        }
+                                        fetchAuditLogs();
+                                        alert("Logs refreshed from server.");
                                     }}
-                                    style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid #fecaca`, background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontWeight: 'bold' }}
+                                    style={{ padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.border}`, background: 'white', cursor: 'pointer', fontWeight: 'bold' }}
                                 >
-                                    🗑️ Clear Logs
+                                    ↻ Refresh
                                 </button>
                             </div>
                         </div>
@@ -2105,6 +2152,16 @@ export default function AdminDashboard({ user }) {
                                 }}
                                 style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}
                             />
+                            <select
+                                value={logTimeFilter}
+                                onChange={(e) => setLogTimeFilter(e.target.value)}
+                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
                             <select
                                 value={logSortOrder}
                                 onChange={(e) => setLogSortOrder(e.target.value)}
@@ -2128,41 +2185,89 @@ export default function AdminDashboard({ user }) {
                                 </thead>
                                 <tbody>
                                     {(() => {
-                                        if (typeof window === 'undefined') return null;
-                                        // Fetch directly from storage to ensure freshness
-                                        let allLogs = JSON.parse(localStorage.getItem('dr_kal_audit_logs') || '[]');
-                                        if (allLogs.length === 0) return <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#888' }}>No activity recorded yet.</td></tr>;
+                                        let filteredLogs = [...auditLogs];
 
-                                        // Sort
-                                        allLogs.sort((a, b) => {
+                                        // Apply Time Filter
+                                        const now = new Date();
+                                        if (logTimeFilter === 'today') {
+                                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                            filteredLogs = filteredLogs.filter(l => new Date(l.timestamp) >= today);
+                                        } else if (logTimeFilter === 'week') {
+                                            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                                            filteredLogs = filteredLogs.filter(l => new Date(l.timestamp) >= weekAgo);
+                                        } else if (logTimeFilter === 'month') {
+                                            const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                                            filteredLogs = filteredLogs.filter(l => new Date(l.timestamp) >= monthAgo);
+                                        }
+
+                                        // Apply Search (from logSearch input managed by ID in previous hack, but let's make it cleaner or stick to it)
+                                        // A better way would be another state, but for brevity I'll keep the DOM-based search if it works.
+                                        // Actually, let's just use the state-based approach for search if needed, but the user asked for pagination.
+
+                                        // Sort: Newest First by default
+                                        filteredLogs.sort((a, b) => {
                                             const dateA = new Date(a.timestamp);
                                             const dateB = new Date(b.timestamp);
                                             return logSortOrder === 'newest' ? dateB - dateA : dateA - dateB;
                                         });
 
-                                        return allLogs.map((log) => (
-                                            <tr key={log.id} className="log-row" style={{ borderBottom: '1px solid #eee' }}>
-                                                <td style={{ ...tdStyle, fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#666', fontFamily: 'monospace' }}>
-                                                    {new Date(log.timestamp).toLocaleString()}
-                                                </td>
-                                                <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.actorName}</td>
-                                                <td style={tdStyle}>
-                                                    <span style={{
-                                                        padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase',
-                                                        background: log.action.includes('PAYMENT') ? '#dcfce7' :
-                                                            log.action.includes('CANCEL') || log.action.includes('DELETE') ? '#fee2e2' :
-                                                                log.action.includes('BOOKED') ? '#e0f2fe' : '#f3f4f6',
-                                                        color: log.action.includes('PAYMENT') ? '#166534' :
-                                                            log.action.includes('CANCEL') || log.action.includes('DELETE') ? '#991b1b' :
-                                                                log.action.includes('BOOKED') ? '#075985' : '#374151'
-                                                    }}>
-                                                        {log.action}
-                                                    </span>
-                                                </td>
-                                                <td style={tdStyle}>{log.targetName}</td>
-                                                <td style={{ ...tdStyle, color: '#555', maxWidth: '300px' }}>{log.details}</td>
-                                            </tr>
-                                        ));
+                                        if (filteredLogs.length === 0) return <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#888' }}>No activity recorded for this period.</td></tr>;
+
+                                        // Pagination Logic
+                                        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+                                        const startIndex = (logPage - 1) * logsPerPage;
+                                        const paginatedLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
+
+                                        return (
+                                            <>
+                                                {paginatedLogs.map((log) => (
+                                                    <tr key={log.id} className="log-row" style={{ borderBottom: '1px solid #eee' }}>
+                                                        <td style={{ ...tdStyle, fontSize: '0.85rem', whiteSpace: 'nowrap', color: '#666', fontFamily: 'monospace' }}>
+                                                            {new Date(log.timestamp).toLocaleString()}
+                                                        </td>
+                                                        <td style={{ ...tdStyle, fontWeight: 'bold' }}>{log.actorName}</td>
+                                                        <td style={tdStyle}>
+                                                            <span style={{
+                                                                padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase',
+                                                                background: log.action.includes('PAYMENT') ? '#dcfce7' :
+                                                                    log.action.includes('CANCEL') || log.action.includes('DELETE') ? '#fee2e2' :
+                                                                        log.action.includes('BOOKED') || log.action.includes('LOGIN') ? '#e0f2fe' : '#f3f4f6',
+                                                                color: log.action.includes('PAYMENT') ? '#166534' :
+                                                                    log.action.includes('CANCEL') || log.action.includes('DELETE') ? '#991b1b' :
+                                                                        log.action.includes('BOOKED') || log.action.includes('LOGIN') ? '#075985' : '#374151'
+                                                            }}>
+                                                                {log.action}
+                                                            </span>
+                                                        </td>
+                                                        <td style={tdStyle}>{log.target || log.targetName || 'System'}</td>
+                                                        <td style={{ ...tdStyle, color: '#555', maxWidth: '300px' }}>{log.details}</td>
+                                                    </tr>
+                                                ))}
+                                                {totalPages > 1 && (
+                                                    <tr>
+                                                        <td colSpan="5" style={{ padding: '24px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px' }}>
+                                                                <button
+                                                                    disabled={logPage === 1}
+                                                                    onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                                                                    style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: logPage === 1 ? 'not-allowed' : 'pointer', opacity: logPage === 1 ? 0.5 : 1, fontWeight: 'bold' }}
+                                                                >
+                                                                    ← Previous
+                                                                </button>
+                                                                <span style={{ fontWeight: 'bold', color: '#64748b' }}>Page {logPage} of {totalPages}</span>
+                                                                <button
+                                                                    disabled={logPage === totalPages}
+                                                                    onClick={() => setLogPage(p => Math.min(totalPages, p + 1))}
+                                                                    style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ccc', background: 'white', cursor: logPage === totalPages ? 'not-allowed' : 'pointer', opacity: logPage === totalPages ? 0.5 : 1, fontWeight: 'bold' }}
+                                                                >
+                                                                    Next →
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        );
                                     })()}
                                 </tbody>
                             </table>

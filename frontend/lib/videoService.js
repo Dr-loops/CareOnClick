@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VideoCallService
  * Centralizes logic for initiating video calls via different providers (Meet, WhatsApp)
  */
@@ -6,6 +6,7 @@
 export const VIDEO_METHODS = {
     MEET: 'meet',
     WHATSAPP: 'whatsapp',
+    PORTAL: 'portal',
     AUTO: 'auto'
 };
 
@@ -34,15 +35,16 @@ export const VideoCallService = {
      * Initiates a Google Meet session 
      * @returns {Promise<String>} Meet Link
      */
-    startMeetSession: async () => {
+    startMeetSession: async (attendees = []) => {
         try {
-            console.log("Calling /api/meet...");
+            console.log(`[Video] Starting Meet session for attendees: ${attendees.join(', ')}`);
             const res = await fetch('/api/meet', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    topic: 'Consultation',
-                    startTime: new Date().toISOString()
+                    topic: 'Virtual Hospital Consultation',
+                    startTime: new Date().toISOString(),
+                    attendees: attendees
                 })
             });
             const data = await res.json();

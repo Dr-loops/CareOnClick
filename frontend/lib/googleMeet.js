@@ -1,4 +1,4 @@
-﻿import { google } from 'googleapis';
+import { google } from 'googleapis';
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.events'];
 
@@ -6,7 +6,7 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googlea
  * Initializes the Google Calendar API client
  * Requires GOOGLE_APPLICATION_CREDENTIALS env var or a key file path
  */
-const getCalendarClient = async () => {
+export const getCalendarClient = async () => {
     try {
         // In a real env, we'd use process.env.GOOGLE_APPLICATION_CREDENTIALS or similar
         // For this implementation, we expect the credentials to be in the env vars
@@ -53,7 +53,7 @@ export const createMeetEvent = async (summary, description, startTime, endTime, 
 
     try {
         const res = await calendar.events.insert({
-            calendarId: 'primary',
+            calendarId: process.env.EMAIL_USER || 'primary',
             resource: event,
             conferenceDataVersion: 1,
         });

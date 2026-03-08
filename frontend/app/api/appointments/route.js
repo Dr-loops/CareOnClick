@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth'; // Adjust import path if needed
 import { notificationService } from '@/lib/notifications';
+import { logAction } from '@/lib/logger';
 
 export async function GET(request) {
     try {
@@ -75,6 +76,15 @@ export async function POST(request) {
                 balanceDue: parseFloat(data.balanceDue || 0),
                 paymentStatus: data.amountPaid > 0 ? 'Paid' : 'Pending', // Simplified logic
             }
+        });
+
+        // Log the action
+        await logAction({
+            action: 'BOOK_APPOINTMENT',
+            actorId: session.user.id,
+            actorName: session.user.name,
+            target: `Appointment:${newAppointment.id}`,
+            details: `Booked appointment with ${data.professionalName} on ${data.date} at ${data.time}.`
         });
 
         // Send Notifications
@@ -153,6 +163,15 @@ export async function PUT(request) {
             }
         }
 
+        // Log the action
+        await logAction({
+            action: 'UPDATE_APPOINTMENT_STATUS',
+            actorId: session.user.id,
+            actorName: session.user.name,
+            target: `Appointment:${id}`,
+            details: `Updated status to ${status}.`
+        });
+
         return NextResponse.json(updatedAppointment);
 
     } catch (error) {
@@ -179,6 +198,15 @@ export async function DELETE(request) {
 
         await prisma.appointment.delete({
             where: { id }
+        });
+
+        // Log the action
+        await logAction({
+            action: 'CANCEL_APPOINTMENT',
+            actorId: session.user.id,
+            actorName: session.user.name,
+            target: `Appointment:${id}`,
+            details: `Appointment deleted/cancelled.`
         });
 
         return NextResponse.json({ success: true });
