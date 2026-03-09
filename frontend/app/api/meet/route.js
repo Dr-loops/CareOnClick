@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createMeetEvent } from '@/lib/googleMeet';
 
 export async function POST(req) {
@@ -14,7 +14,7 @@ export async function POST(req) {
         if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
             console.warn("Missing Google Credentials. Returning Mock Link.");
             return NextResponse.json({
-                link: "https://meet.google.com/mock-meet-link-" + Math.random().toString(36).substring(7),
+                link: "https://meet.google.com/new",
                 mock: true
             });
         }
@@ -32,7 +32,7 @@ export async function POST(req) {
         console.error("Meet Creation Failed:", error);
         // Fallback for demo purposes if API fails
         return NextResponse.json({
-            link: "https://meet.google.com/error-fallback",
+            link: "https://meet.google.com/new",
             error: error.message
         }, { status: 500 }); // Or 200 with error flag to keep UI flowing
     }
