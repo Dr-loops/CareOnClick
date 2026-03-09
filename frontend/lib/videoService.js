@@ -48,10 +48,10 @@ export const VideoCallService = {
                 })
             });
             const data = await res.json();
-            return data.link || "https://meet.google.com/new";
+            return data.link || "https://meet.google.com/oew-uyne-rbb";
         } catch (e) {
             console.error("Failed to create meet:", e);
-            return "https://meet.google.com/new"; // Fallback
+            return "https://meet.google.com/oew-uyne-rbb"; // Fallback
         }
     },
 
