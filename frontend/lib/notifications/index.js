@@ -2,18 +2,17 @@
 import nodemailer from 'nodemailer';
 import twilio from 'twilio';
 import sgMail from '@sendgrid/mail';
+import { sendEmailViaGmailAPI } from '@/lib/gmailApi';
 
-// Safe console-only logger (Vercel has read-only filesystem, so no file writing)
+// Safe console-only logger (Vercel has read-only filesystem - no file writes allowed)
 class LocalAdapter {
     static async sendSMS(to, body) {
-        const log = `📱 [SMS-MOCK] ➔ To: ${to} | Body: "${body}"`;
-        console.log('\x1b[36m%s\x1b[0m', log);
+        console.log(`📱 [SMS-MOCK] ➔ To: ${to} | Body: "${body}"`);
         return { success: true, method: 'LOCAL_MOCK', mockMode: true };
     }
 
     static async sendEmail(to, subject, text) {
-        const log = `📧 [EMAIL-MOCK] ➔ To: ${to} | Subject: "${subject}" | Content: ${text?.substring(0, 50)}...`;
-        console.warn('\x1b[33m%s\x1b[0m', log);
+        console.warn(`📧 [EMAIL-MOCK] ➔ To: ${to} | Subject: "${subject}" (NOT SENT - all providers failed)`);
         return { success: true, method: 'LOCAL_MOCK', mockMode: true };
     }
 }
@@ -28,7 +27,6 @@ class NotificationService {
             try {
                 this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                 this.twilioPhone = process.env.TWILIO_PHONE_NUMBER;
-                console.log('[Notify] Twilio initialized.');
             } catch (e) {
                 console.error('[Notify] Twilio Init Failed:', e.message);
             }
@@ -39,7 +37,6 @@ class NotificationService {
             sgMail.setApiKey(process.env.SENDGRID_API_KEY);
             this.sendGridEnabled = true;
             this.emailFrom = process.env.SENDGRID_FROM_EMAIL || 'noreply@drkalhospital.com';
-            console.log('[Notify] SendGrid initialized.');
         }
     }
 
@@ -50,79 +47,69 @@ class NotificationService {
                 console.log(`[Notify] [SMS-REAL] (Twilio) Sent to ${to}`);
                 return { success: true, method: 'TWILIO' };
             } catch (error) {
-                console.error('[Notify] Twilio Send Error:', error.message);
+                console.error('[Notify] Twilio Error:', error.message);
             }
         }
         return LocalAdapter.sendSMS(to, body);
     }
 
     async sendEmail(to, subject, text, html) {
-        // 1. Try Nodemailer (Gmail/SMTP) - PRIMARY
-        // Uses static import (NOT dynamic) to ensure Vercel bundles this correctly
+        // 1. Try Gmail REST API using Service Account (most reliable from Vercel)
+        if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.EMAIL_USER) {
+            try {
+                console.log(`[Notify] Attempting Gmail API send to: ${to}`);
+                const result = await sendEmailViaGmailAPI({ to, subject, text, html });
+                return result;
+            } catch (gmailError) {
+                console.error('[Notify] Gmail API failed, trying SMTP fallback:', gmailError.message);
+                // Fall through to SMTP
+            }
+        }
+
+        // 2. Try Nodemailer SMTP fallback
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             try {
-                console.log(`[Notify] Attempting Nodemailer SMTP to: ${to}`);
+                console.log(`[Notify] Attempting SMTP send to: ${to}`);
                 const transporter = nodemailer.createTransport({
                     host: 'smtp.gmail.com',
                     port: 465,
-                    secure: true,  // Use SSL on port 465
+                    secure: true,
                     auth: {
                         user: process.env.EMAIL_USER,
                         pass: process.env.EMAIL_PASS,
                     },
-                    tls: {
-                        rejectUnauthorized: false  // Allow self-signed certs in serverless
-                    }
                 });
-
-                // Verify connection first to provide helpful error messages
-                await transporter.verify();
-                console.log('[Notify] SMTP connection verified OK.');
-
                 await transporter.sendMail({
                     from: `"${process.env.EMAIL_FROM_NAME || 'CareOnClick'}" <${process.env.EMAIL_USER}>`,
-                    to,
-                    subject,
-                    text,
-                    html: html || `<p>${text}</p>`
+                    to, subject, text, html: html || `<p>${text}</p>`
                 });
-
-                console.log(`[Notify] [EMAIL-REAL] (Nodemailer/Gmail) Sent to ${to}`);
+                console.log(`[Notify] [EMAIL-REAL] (SMTP) Sent to ${to}`);
                 return { success: true, method: 'NODEMAILER' };
-            } catch (error) {
-                // Log the FULL error so it shows in Vercel function logs
-                console.error('[Notify] Nodemailer SMTP Error (full):', JSON.stringify({
-                    message: error.message,
-                    code: error.code,
-                    command: error.command,
-                    responseCode: error.responseCode,
-                    response: error.response
-                }));
-                // Fall through to SendGrid or mock
+            } catch (smtpError) {
+                console.error('[Notify] SMTP Error:', {
+                    message: smtpError.message,
+                    code: smtpError.code,
+                    responseCode: smtpError.responseCode,
+                    response: smtpError.response,
+                });
             }
-        } else {
-            console.warn('[Notify] EMAIL_USER or EMAIL_PASS missing from environment!');
         }
 
-        // 2. Try SendGrid - SECONDARY
+        // 3. Try SendGrid
         if (this.sendGridEnabled) {
             try {
                 await sgMail.send({
-                    to,
-                    from: this.emailFrom,
-                    subject,
-                    text,
-                    html: html || `<p>${text}</p>`
+                    to, from: this.emailFrom, subject, text, html: html || `<p>${text}</p>`
                 });
                 console.log(`[Notify] [EMAIL-REAL] (SendGrid) Sent to ${to}`);
                 return { success: true, method: 'SENDGRID' };
-            } catch (error) {
-                console.error('[Notify] SendGrid Error:', error.message);
+            } catch (sgError) {
+                console.error('[Notify] SendGrid Error:', sgError.message);
             }
         }
 
-        // 3. Fallback to Local Mock (no file write - Vercel is read-only)
-        console.warn(`[Notify] All email providers failed. Falling back to mock for: ${to}`);
+        // 4. All providers failed — log and return mockMode
+        console.error(`[Notify] ALL EMAIL PROVIDERS FAILED for: ${to}`);
         return LocalAdapter.sendEmail(to, subject, text);
     }
 
