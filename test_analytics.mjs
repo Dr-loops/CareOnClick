@@ -1,14 +1,10 @@
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { auth } from '@/auth';
+import { PrismaClient } from '@prisma/client';
 
-export async function GET() {
+const prisma = new PrismaClient();
+
+async function testAnalytics() {
     try {
-        const session = await auth();
-        if (!session || session.user.role?.toLowerCase() !== 'admin') {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
+        console.log("Fetching medical records...");
         // 1. Diagnosis Analysis
         const medicalRecords = await prisma.medicalRecord.findMany({
             where: { structuredData: { not: null } },
@@ -35,8 +31,6 @@ export async function GET() {
 
                 // Extract Prescriptions
                 if (results.treatmentPlan) {
-                    // Simple regex/keyword extraction might be needed if it's a block of text
-                    // For now, let's look for specific medications if they were explicitly listed
                     if (results.medications) {
                         const meds = results.medications.split(',').map(s => s.trim()).filter(Boolean);
                         meds.forEach(m => {
@@ -49,16 +43,7 @@ export async function GET() {
             }
         });
 
-        const topDiagnoses = Object.entries(diagnosisCounts)
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
-
-        const topPrescriptions = Object.entries(prescriptionCounts)
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
-
+        console.log("Fetching users...");
         // 2. Demographic Analysis
         const users = await prisma.user.findMany({
             where: { role: 'patient' },
@@ -87,46 +72,30 @@ export async function GET() {
             }
         });
 
+        console.log("Fetching vitals...");
         // 3. Vitals Trends (Recent)
         const latestVitals = await prisma.vitalSign.findMany({
             orderBy: { recordedAt: 'desc' },
             take: 100
         });
 
-        let avgTemp = 0, avgHr = 0, avgSpo2 = 0;
-        if (latestVitals.length > 0) {
-            avgTemp = latestVitals.reduce((acc, v) => acc + v.temperature, 0) / latestVitals.length;
-            avgHr = latestVitals.reduce((acc, v) => acc + v.heartRate, 0) / latestVitals.length;
-            avgSpo2 = latestVitals.reduce((acc, v) => acc + v.spo2, 0) / latestVitals.length;
-        }
+        console.log("Vitals Length:", latestVitals.length);
 
-        // 4. Appointment Trends (Mocking slightly if DB is thin, but targeting real structure)
+        console.log("Fetching appointments...");
+        // 4. Appointment Trends
         const appointments = await prisma.appointment.findMany({
             where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
         });
 
-        return NextResponse.json({
-            topDiagnoses,
-            topPrescriptions,
-            demographics: {
-                regions: Object.entries(regionCounts).map(([name, value]) => ({ name, value })),
-                gender: Object.entries(genderCounts).map(([name, value]) => ({ name, value })),
-                age: Object.entries(ageRanges).map(([name, value]) => ({ name, value }))
-            },
-            vitals: {
-                avgTemp: avgTemp.toFixed(1),
-                avgHr: Math.round(avgHr),
-                avgSpo2: Math.round(avgSpo2)
-            },
-            totalStats: {
-                patients: users.length,
-                appointments: appointments.length,
-                records: medicalRecords.length
-            }
-        });
+        console.log("Appointments Length:", appointments.length);
 
-    } catch (error) {
-        console.error("Analytics aggregation failed", error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.log("SUCCESS!");
+    } catch (e) {
+        console.error("ERROR CAUGHT:");
+        console.error(e);
+    } finally {
+        await prisma.$disconnect();
     }
 }
+
+testAnalytics();
