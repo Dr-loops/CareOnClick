@@ -56,6 +56,7 @@ export const createMeetEvent = async (summary, description, startTime, endTime, 
             calendarId: process.env.EMAIL_USER || 'primary',
             resource: event,
             conferenceDataVersion: 1,
+            sendUpdates: 'all',
         });
 
         return {

@@ -109,12 +109,77 @@ export default function PatientDashboard({ user }) {
 
     const handleSelectVideoMethod = async (method) => {
         setIsVideoModalOpen(false);
+
+        // Log the activity for the Admin
+        const { logAudit } = require('@/lib/global_sync');
+        logAudit({
+            actorId: user.id,
+            actorName: user.name,
+            action: `INITIATED ${method.toUpperCase()} CALL`,
+            targetId: selectedProfessional?.id || 'SUPPORT',
+            targetName: selectedProfessional?.name || 'Support Team',
+            location: 'Patient Dashboard',
+            notes: `Method: ${method}`
+        });
+
         if (method === VIDEO_METHODS.MEET) {
-            const link = await VideoCallService.startMeetSession();
+            const attendees = selectedProfessional?.email ? [selectedProfessional.email] : [];
+            const link = await VideoCallService.startMeetSession(attendees);
             window.open(link, '_blank');
+
+            // Notify Support/Professional
+            try {
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: selectedProfessional?.email || "support@careonclick.com",
+                        subject: "Patient is starting a Video Consultation",
+                        text: `Hello, patient ${user.name} is starting a video call. Join here: ${link}`,
+                        html: `
+                            <div style="font-family: sans-serif; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; max-width: 600px; margin: 0 auto; background: #ffffff;">
+                                <h2 style="color: #0ea5e9; margin-top: 0;">Patient Calling</h2>
+                                <p style="font-size: 16px; color: #334155;">Patient <strong>${user.name}</strong> is initiating a video consultation.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${link}" style="display: inline-block; padding: 14px 30px; background: #6366f1; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 16px;">Join Meeting</a>
+                                </div>
+                            </div>
+                        `
+                    })
+                });
+            } catch (e) { console.error("Notification failed", e); }
+
         } else if (method === VIDEO_METHODS.WHATSAPP) {
-            window.open('https://wa.me/233540509530', '_blank'); // Support number
+            const number = selectedProfessional?.whatsappNumber || '233540509530';
+            window.open(`https://wa.me/${number.replace(/\+/g, '')}`, '_blank');
         } else {
+            // Portal Room
+            const portalLink = `${window.location.origin}/dashboard/professional?joinCall=${user.id}`;
+            if (selectedProfessional) {
+                const socket = getSocket();
+                if (socket) {
+                    socket.emit('call-invite', {
+                        to: selectedProfessional.id,
+                        from: user.id,
+                        name: user.name,
+                        roomId: user.id
+                    });
+                }
+
+                // Notify via Email
+                try {
+                    await fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: selectedProfessional.email,
+                            subject: "Patient Waiting in Video Room",
+                            text: `Patient ${user.name} is waiting for you in the portal video room: ${portalLink}`,
+                            html: `<p>Patient <strong>${user.name}</strong> is waiting. <a href="${portalLink}">Join Room</a></p>`
+                        })
+                    });
+                } catch (e) { }
+            }
             router.push(`/consultation/${patientId}`);
         }
     };

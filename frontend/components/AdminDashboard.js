@@ -139,6 +139,7 @@ export default function AdminDashboard({ user }) {
     const [registrationsSearch, setRegistrationsSearch] = useState('');
     const [searchQuery, setSearchQuery] = useState(''); // Patient search
     const [viewingPatientId, setViewingPatientId] = useState(null);
+    const [editingPatient, setEditingPatient] = useState(null);
     const [editingProfessional, setEditingProfessional] = useState(null);
     const [logSortOrder, setLogSortOrder] = useState('newest');
     const [logTimeFilter, setLogTimeFilter] = useState('all'); // all, today, week, month
@@ -171,6 +172,18 @@ export default function AdminDashboard({ user }) {
         if (!selectedVideoTarget) return;
 
         console.log(`[Video] Selected method: ${method} for ${selectedVideoTarget.name}`);
+
+        // Log the activity for the Admin
+        const { logAudit } = require('@/lib/global_sync');
+        logAudit({
+            actorId: user.id,
+            actorName: user.name,
+            action: `INITIATED ${method.toUpperCase()} CALL`,
+            targetId: selectedVideoTarget.id,
+            targetName: selectedVideoTarget.name,
+            location: 'Admin Dashboard',
+            notes: `Method: ${method}`
+        });
 
         if (method === VIDEO_METHODS.MEET) {
             const attendees = selectedVideoTarget.email ? [selectedVideoTarget.email] : [];
@@ -219,12 +232,15 @@ export default function AdminDashboard({ user }) {
                         subject: "Urgent: Video Consultation Link - Dr. Kal's Virtual Hospital",
                         text: `Hello ${selectedVideoTarget.name},\n\nDr. Kal (or staff) is starting a video consultation with you.\n\nPlease join here: ${link}\n\nThank you.`,
                         html: `
-                            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
-                                <h2 style="color: #0ea5e9;">Video Consultation Invitation</h2>
-                                <p>Hello <strong>${selectedVideoTarget.name}</strong>,</p>
-                                <p>Your healthcare provider is ready to see you for your scheduled consultation.</p>
-                                <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">Join Google Meet Session</a>
-                                <p style="margin-top: 20px; font-size: 0.9rem; color: #64748b;">If the button doesn't work, copy this link: ${link}</p>
+                            <div style="font-family: sans-serif; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; max-width: 600px; margin: 0 auto; background: #ffffff;">
+                                <h2 style="color: #0ea5e9; margin-top: 0;">Video Consultation Invitation</h2>
+                                <p style="font-size: 16px; color: #334155;">Hello <strong>${selectedVideoTarget.name}</strong>,</p>
+                                <p style="font-size: 16px; color: #334155; line-height: 1.6;">Your healthcare provider is ready to see you for your scheduled consultation. Please click the button below to join the secure session.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${link}" style="display: inline-block; padding: 14px 30px; background: #6366f1; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);">Join Google Meet Session</a>
+                                </div>
+                                <p style="font-size: 14px; color: #64748b; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px dashed #cbd5e1;"><strong>Note:</strong> If the button doesn't work, copy and paste this link into your browser: <br/> <span style="color: #6366f1;">${link}</span></p>
+                                <p style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; font-size: 13px; color: #94a3b8; text-align: center;">CareOnClick Virtual Hospital System</p>
                             </div>
                         `
                     })
@@ -232,20 +248,29 @@ export default function AdminDashboard({ user }) {
                 
                 const notifyResult = await res.json();
                 if (notifyResult.success) {
-                    alert(`✅ Meeting link sent to ${selectedVideoTarget.name} via email/SMS and added to their inbox.`);
-                } else {
-                    console.error("[Video] Notification API failed", notifyResult);
-                    alert(`⚠️ Link generated, but notification failed: ${notifyResult.error || 'Unknown error'}`);
+                    alert(`✅ Meeting link sent to ${selectedVideoTarget.name} via email/SMS.`);
                 }
             } catch (e) {
                 console.error("Failed to send automated notifications:", e);
-                alert("⚠️ Link generated, but an error occurred while notifying the patient.");
             }
 
         } else if (method === VIDEO_METHODS.WHATSAPP) {
             const number = selectedVideoTarget.whatsappNumber || selectedVideoTarget.phoneNumber;
             if (number) {
-                window.open(VideoCallService.getWhatsAppLink(number), '_blank');
+                const link = VideoCallService.getWhatsAppLink(number);
+                window.open(link, '_blank');
+                
+                // Also notify via standard routes if possible
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: selectedVideoTarget.email,
+                        phoneNumber: selectedVideoTarget.phoneNumber,
+                        subject: "Video Call Invitation - WhatsApp",
+                        text: `Hello ${selectedVideoTarget.name}, Dr. Kal is calling you via WhatsApp. Please check your messages.`
+                    })
+                });
             } else {
                 alert("No WhatsApp number found for this user.");
             }
@@ -260,6 +285,34 @@ export default function AdminDashboard({ user }) {
                     roomId: user.id
                 });
             }
+
+            // [NEW] Also notify via Email/SMS for Portal calls
+            const portalLink = `${window.location.origin}/dashboard/patient?joinCall=${user.id}`;
+            try {
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: selectedVideoTarget.email,
+                        phoneNumber: selectedVideoTarget.phoneNumber,
+                        subject: "Urgent: Join Hospital Video Room",
+                        text: `Hello ${selectedVideoTarget.name}, please log in to your dashboard to join the video call: ${portalLink}`,
+                        html: `
+                            <div style="font-family: sans-serif; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; max-width: 600px; margin: 0 auto; background: #ffffff;">
+                                <h2 style="color: #f59e0b; margin-top: 0;">In-Portal Video Call</h2>
+                                <p style="font-size: 16px; color: #334155;">Hello <strong>${selectedVideoTarget.name}</strong>,</p>
+                                <p style="font-size: 16px; color: #334155; line-height: 1.6;">Dr. Kal is inviting you to join a secure video consultation room directly within the hospital portal.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${portalLink}" style="display: inline-block; padding: 14px 30px; background: #f59e0b; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2);">Enter Video Room</a>
+                                </div>
+                                <p style="font-size: 14px; color: #64748b; background: #fffbeb; padding: 12px; border-radius: 8px; border: 1px dashed #fcd34d;">You will be asked to grant camera and microphone access once you enter the room.</p>
+                                <p style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; font-size: 13px; color: #94a3b8; text-align: center;">CareOnClick Virtual Hospital System</p>
+                            </div>
+                        `
+                    })
+                });
+            } catch (e) { console.error("Portal notification failed", e); }
+
             setShowVideoConsultation(true);
         }
     };

@@ -122,6 +122,7 @@ export async function GET() {
 
 export async function POST(request) {
     try {
+        const session = await auth();
         const body = await request.json();
         const { collection, item, action, id, updates } = body;
 
@@ -168,7 +169,19 @@ export async function POST(request) {
         }
 
         if (action === 'add') {
-            const newRecord = await modelDelegate.create({ data: dataToSave });
+            let finalizedData = dataToSave;
+            if (collection === 'audit_logs' || collection === 'activity_logs') {
+                // Prisma model only has specific fields. Filter others.
+                finalizedData = {
+                    action: dataToSave.action,
+                    actorId: dataToSave.actorId,
+                    actorName: dataToSave.actorName,
+                    target: dataToSave.target || dataToSave.targetName || 'System',
+                    details: dataToSave.details || dataToSave.notes || dataToSave.formattedLog,
+                    timestamp: dataToSave.timestamp ? new Date(dataToSave.timestamp) : new Date()
+                };
+            }
+            const newRecord = await modelDelegate.create({ data: finalizedData });
 
             // APPOINTMENT CONFIRMATION NOTIFICATIONS
             if (collection === 'appointments' && newRecord) {
@@ -215,13 +228,15 @@ export async function POST(request) {
             }
 
             // Log the action
-            await logAction({
-                action: 'ADD_RECORD',
-                actorId: session.user.id,
-                actorName: session.user.name,
-                target: `${collection}:${newRecord.id}`,
-                details: `Added new item to ${collection}.`
-            });
+            if (session && session.user) {
+                await logAction({
+                    action: 'ADD_RECORD',
+                    actorId: session.user.id,
+                    actorName: session.user.name,
+                    target: `${collection}:${newRecord.id}`,
+                    details: `Added new item to ${collection}.`
+                });
+            }
 
         } else if (action === 'update' || action === 'save') {
             // Handle both email (legacy user ID) and UUIDs
@@ -339,13 +354,15 @@ export async function POST(request) {
                 console.log("Successfully updated User/Profile for:", user.email);
 
                 // Log the action
-                await logAction({
-                    action: 'UPDATE_PATIENT_PROFILE',
-                    actorId: session.user.id,
-                    actorName: session.user.name,
-                    target: `User:${user.id}`,
-                    details: `Updated profile for patient ${user.name}.`
-                });
+                if (session && session.user) {
+                    await logAction({
+                        action: 'UPDATE_PATIENT_PROFILE',
+                        actorId: session.user.id,
+                        actorName: session.user.name,
+                        target: `User:${user.id}`,
+                        details: `Updated profile for patient ${user.name}.`
+                    });
+                }
 
                 return NextResponse.json({ success: true });
             }
@@ -373,13 +390,15 @@ export async function POST(request) {
             await modelDelegate.delete({ where: { id } });
 
             // Log the action
-            await logAction({
-                action: 'DELETE_RECORD',
-                actorId: session.user.id,
-                actorName: session.user.name,
-                target: `${collection}:${id}`,
-                details: `Deleted item from ${collection}.`
-            });
+            if (session && session.user) {
+                await logAction({
+                    action: 'DELETE_RECORD',
+                    actorId: session.user.id,
+                    actorName: session.user.name,
+                    target: `${collection}:${id}`,
+                    details: `Deleted item from ${collection}.`
+                });
+            }
         }
 
         return NextResponse.json({ success: true });

@@ -13,7 +13,7 @@ export async function POST(req) {
             await notificationService.sendSMS(phoneNumber, text);
         } else {
             // General notification handling
-            if (to) await notificationService.sendEmail(to, subject || 'Notification', text);
+            if (to) await notificationService.sendEmail(to, subject || 'Notification', text, html);
             if (phoneNumber) await notificationService.sendSMS(phoneNumber, text);
         }
 
