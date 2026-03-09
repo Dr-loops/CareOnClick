@@ -147,6 +147,14 @@ export default function PatientDashboard({ user }) {
                         `
                     })
                 });
+                const notifyResult = await res.json();
+                if (notifyResult.success) {
+                    if (notifyResult.mockMode) {
+                        alert(`⚠️ Warning: Email service is not configured! The email to ${selectedProfessional?.name || 'Support'} was mocked and NOT actually sent. Please add EMAIL_USER and EMAIL_PASS to your Vercel Environment Variables.`);
+                    } else {
+                        alert(`✅ Meeting link sent to ${selectedProfessional?.name || 'Support'} via email/SMS.`);
+                    }
+                }
             } catch (e) { console.error("Notification failed", e); }
 
         } else if (method === VIDEO_METHODS.WHATSAPP) {

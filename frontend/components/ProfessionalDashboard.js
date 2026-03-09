@@ -547,6 +547,14 @@ export default function ProfessionalDashboard({ user }) {
                         `
                     })
                 });
+                const notifyResult = await res.json();
+                if (notifyResult.success) {
+                    if (notifyResult.mockMode) {
+                        alert(`⚠️ Warning: Email service is not configured! The email to ${selectedPatient.name} was mocked and NOT actually sent. Please add EMAIL_USER and EMAIL_PASS to your Vercel Environment Variables.`);
+                    } else {
+                        alert(`✅ Meeting link sent to ${selectedPatient.name} via email/SMS.`);
+                    }
+                }
             } catch (e) {
                 console.error("Failed to send automated notifications:", e);
             }

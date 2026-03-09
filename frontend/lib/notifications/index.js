@@ -25,7 +25,7 @@ class LocalAdapter {
         const log = `📧 [EMAIL-REEL] ➔ To: ${to} | Subject: "${subject}" | Content: ${text?.substring(0, 10)}... (HTML: ${!!html})`;
         await LocalAdapter.writeLog(log);
         console.log('\x1b[33m%s\x1b[0m', log); // Yellow color
-        return { success: true, method: 'LOCAL_MOCK' };
+        return { success: true, method: 'LOCAL_MOCK', mockMode: true };
     }
 
     static async writeLog(message) {
