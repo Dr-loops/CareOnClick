@@ -173,17 +173,20 @@ export default function AdminDashboard({ user }) {
 
         console.log(`[Video] Selected method: ${method} for ${selectedVideoTarget.name}`);
 
-        // Log the activity for the Admin
-        const { logAudit } = require('@/lib/global_sync');
-        logAudit({
-            actorId: user.id,
-            actorName: user.name,
-            action: `INITIATED ${method.toUpperCase()} CALL`,
-            targetId: selectedVideoTarget.id,
-            targetName: selectedVideoTarget.name,
-            location: 'Admin Dashboard',
-            notes: `Method: ${method}`
-        });
+        // Log the activity for the Admin (direct API call for reliable server-side persistence)
+        fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                actorId: user.id,
+                actorName: user.name,
+                action: `INITIATED ${method.toUpperCase()} CALL`,
+                target: selectedVideoTarget.name,
+                targetName: selectedVideoTarget.name,
+                details: `Method: ${method} | To: ${selectedVideoTarget.email || selectedVideoTarget.id}`,
+                location: 'Admin Dashboard'
+            })
+        }).catch(e => console.error('Log failed:', e));
 
         if (method === VIDEO_METHODS.MEET) {
             const attendees = selectedVideoTarget.email ? [selectedVideoTarget.email] : [];

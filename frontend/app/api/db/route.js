@@ -69,7 +69,7 @@ export async function GET() {
             activity_logs = await prisma.auditLog.findMany({
                 where: isPatient ? { actorId: user.id } : {},
                 orderBy: { timestamp: 'desc' },
-                take: 20
+                take: 100
             });
             console.log(`- AuditLogs: ${activity_logs.length}`);
             

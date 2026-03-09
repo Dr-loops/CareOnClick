@@ -110,17 +110,19 @@ export default function PatientDashboard({ user }) {
     const handleSelectVideoMethod = async (method) => {
         setIsVideoModalOpen(false);
 
-        // Log the activity for the Admin
-        const { logAudit } = require('@/lib/global_sync');
-        logAudit({
-            actorId: user.id,
-            actorName: user.name,
-            action: `INITIATED ${method.toUpperCase()} CALL`,
-            targetId: selectedProfessional?.id || 'SUPPORT',
-            targetName: selectedProfessional?.name || 'Support Team',
-            location: 'Patient Dashboard',
-            notes: `Method: ${method}`
-        });
+        // Log the activity for the Admin (direct API call for reliable server-side persistence)
+        fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                actorId: user.id,
+                actorName: user.name,
+                action: `INITIATED ${method.toUpperCase()} CALL`,
+                target: selectedProfessional?.name || 'Support Team',
+                details: `Method: ${method} | To: ${selectedProfessional?.email || selectedProfessional?.id || 'Support'}`,
+                location: 'Patient Dashboard'
+            })
+        }).catch(e => console.error('Log failed:', e));
 
         if (method === VIDEO_METHODS.MEET) {
             const attendees = selectedProfessional?.email ? [selectedProfessional.email] : [];

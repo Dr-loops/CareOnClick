@@ -493,16 +493,19 @@ export default function ProfessionalDashboard({ user }) {
         setIsVideoModalOpen(false);
         if (!selectedPatient) return;
 
-        // Log the activity for the Admin
-        logAudit({
-            actorId: user.id,
-            actorName: user.name,
-            action: `INITIATED ${method.toUpperCase()} CALL`,
-            targetId: selectedPatient.id,
-            targetName: selectedPatient.name,
-            location: 'Professional Dashboard',
-            notes: `Method: ${method}`
-        });
+        // Log the activity for the Admin (direct API call for reliable server-side persistence)
+        fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                actorId: user.id,
+                actorName: user.name,
+                action: `INITIATED ${method.toUpperCase()} CALL`,
+                target: selectedPatient.name,
+                details: `Method: ${method} | To: ${selectedPatient.email || selectedPatient.id}`,
+                location: 'Professional Dashboard'
+            })
+        }).catch(e => console.error('Log failed:', e));
 
         if (method === VIDEO_METHODS.MEET) {
             const attendees = selectedPatient.email ? [selectedPatient.email] : [];
