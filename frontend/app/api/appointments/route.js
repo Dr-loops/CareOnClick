@@ -1,9 +1,10 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { auth } from '@/auth'; // Adjust import path if needed
+import { auth } from '@/auth';
 import { notificationService } from '@/lib/notifications';
 import { logAction } from '@/lib/logger';
+import { notifyProfessionalNewBooking, notifyPatientAppointmentStatus } from '@/lib/onesignal';
 
 export async function GET(request) {
     try {
@@ -87,18 +88,16 @@ export async function POST(request) {
             details: `Booked appointment with ${data.professionalName} on ${data.date} at ${data.time}.`
         });
 
-        // Send Notifications
-        // 1. To Professional
+        // Send OneSignal Push to Professional
         try {
-            // Need to fetch professional's contact info (phone/email) to send real notification
-            // For now, using the generic service which handles the logic or logs it
-            await notificationService.sendSMS(
-                'SYSTEM', // System ID
-                `New Pending Booking: ${session.user.name} for ${data.date} at ${data.time}. Type: ${data.type}`
-            );
-            // Ideally we look up the professional's phone number here
+            await notifyProfessionalNewBooking({
+                professionalId: data.professionalId,
+                patientName: session.user.name,
+                date: data.date,
+                time: data.time,
+            });
         } catch (e) {
-            console.error("Failed to send notification", e);
+            console.error("[OneSignal] Failed to notify professional of booking:", e);
         }
 
         return NextResponse.json(newAppointment);
@@ -154,10 +153,14 @@ export async function PUT(request) {
                     }
                 });
 
-                // Also trigger real-time notification service if available
-                if (status === 'Cancelled') {
-                    await notificationService.sendSMS('SYSTEM', `Appointment ${id} ${actionText} for ${updatedAppointment.patientName}`);
-                }
+                // OneSignal: push notification to patient
+                await notifyPatientAppointmentStatus({
+                    patientId: updatedAppointment.patientId,
+                    professionalName: updatedAppointment.professionalName,
+                    status,
+                    date: updatedAppointment.date,
+                    time: updatedAppointment.time,
+                });
             } catch (notifyErr) {
                 console.error("Failed to create status notification message", notifyErr);
             }

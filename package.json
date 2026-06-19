@@ -3,10 +3,9 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "cd frontend && npm run dev",
+        "dev": "node server.js",
         "build": "cd frontend && npx prisma generate && next build",
-        "postinstall": "cd frontend && npm install --legacy-peer-deps",
-        "start": "cd frontend && npm start",
+        "start": "node server.js",
         "lint": "cd frontend && npm run lint"
     },
     "dependencies": {

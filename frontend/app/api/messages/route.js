@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { notificationService } from '@/lib/notifications';
+import { notifyNewMessage } from '@/lib/onesignal';
 
 export async function GET(request) {
     try {
@@ -127,6 +128,19 @@ export async function POST(request) {
 
         if (type === 'ALERT') {
             await notificationService.sendAlert([recipient], content);
+        }
+
+        // OneSignal: push for all direct chat/alert messages
+        if (recipientId && type !== 'SMS' && type !== 'EMAIL') {
+            try {
+                await notifyNewMessage({
+                    recipientId,
+                    senderName: resolvedSenderName,
+                    preview: content.length > 80 ? content.slice(0, 77) + '...' : content,
+                });
+            } catch (e) {
+                console.error('[OneSignal] Failed to push message notification:', e);
+            }
         }
 
         return NextResponse.json({ success: true, message: newMessage });

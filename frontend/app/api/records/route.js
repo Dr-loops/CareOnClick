@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
+import { notifyPatientNewResults } from '@/lib/onesignal';
 
 export async function GET(request) {
     try {
@@ -90,13 +91,15 @@ export async function POST(request) {
             }
         });
 
-        // Trigger Notification to Patient
-        // We'll leave this for the NotificationService if we want to expand it later.
-        // For now, it's just stored.
+        // OneSignal: push notification to patient about new result
+        try {
+            await notifyPatientNewResults(data.patientId, session.user.name);
+        } catch (e) {
+            console.error('[OneSignal] Failed to notify patient of new record:', e);
+        }
 
         return NextResponse.json(newRecord);
 
-        console.error("Failed to create record", error);
     } catch (error) {
         console.error("Failed to create record", error);
         return NextResponse.json({ error: 'Failed to create record' }, { status: 500 });

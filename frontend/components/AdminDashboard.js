@@ -1337,7 +1337,9 @@ export default function AdminDashboard({ user }) {
                                     const minutes = Number(timeParts[1]);
 
                                     const dateObj = new Date(y, m - 1, d, hours, minutes);
-                                    if (isNaN(dateObj.getTime())) throw new Error("Invalid Date Object");
+                                    if (isNaN(dateObj.getTime())) {
+                                        return `${dateStr} ${timeStr}`;
+                                    }
 
                                     // Manual Formatting to Guarantee "Words"
                                     const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];

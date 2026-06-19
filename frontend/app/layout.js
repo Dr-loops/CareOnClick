@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import { AuthProvider } from '@/components/AuthProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import NotificationManager from '@/components/NotificationManager';
+import OneSignalInit from '@/components/OneSignalInit';
 
 const montserrat = Montserrat({
     subsets: ['latin'],
@@ -36,9 +37,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
     return (
         <html lang="en">
+            <head>
+                <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+            </head>
             <body className={`${openSans.variable} ${montserrat.variable}`} suppressHydrationWarning={true}>
                 <AuthProvider>
                     <Navbar />
+                    <OneSignalInit />
                     <NotificationManager />
                     <DashboardNav />
                     <main className="main-content">
