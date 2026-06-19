@@ -29,6 +29,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [isCameraSwitching, setIsCameraSwitching] = useState(false);
     const [facingMode, setFacingMode] = useState('user');
+    const [pinnedParticipantId, setPinnedParticipantId] = useState('local');
     const [error, setError] = useState(null);
 
     const localVideoRef = useRef();
@@ -132,6 +133,13 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
             setRemoteParticipants(prev => {
                 if (prev.find(p => p.sid === participant.sid)) return prev;
+                // Auto pin the first remote participant
+                setPinnedParticipantId(currentPinned => {
+                    if (prev.length === 0 && currentPinned === 'local') {
+                        return participant.sid;
+                    }
+                    return currentPinned;
+                });
                 return [...prev, participant];
             });
 
@@ -156,6 +164,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
         const handleParticipantDisconnected = (participant) => {
             console.log(`[Twilio Video] Participant disconnected: ${participant.identity}`);
             setRemoteParticipants(prev => prev.filter(p => p.sid !== participant.sid));
+            setPinnedParticipantId(prev => prev === participant.sid ? 'local' : prev);
         };
 
         connect();
@@ -263,7 +272,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
     };
 
     // ── Render helper for remote participant video ──
-    const RemoteParticipantView = ({ participant }) => {
+    const RemoteParticipantView = ({ participant, isPinned, onClick }) => {
         const videoRef = useRef();
         const audioRef = useRef();
 
@@ -310,7 +319,10 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
         }, [participant]);
 
         return (
-            <div className="video-wrapper">
+            <div 
+                className={`video-wrapper ${isPinned ? 'pinned' : 'thumbnail'}`}
+                onClick={onClick}
+            >
                 <div ref={videoRef} style={{ width: '100%', height: '100%' }} />
                 <div ref={audioRef} style={{ display: 'none' }} />
                 <div className="participant-label">{participant.identity || 'Guest'}</div>
@@ -324,37 +336,65 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col font-sans overflow-hidden">
             <style jsx>{`
                 .video-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                    gap: 16px;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px;
                     padding: 80px 20px 140px;
                     width: 100%;
-                    height: 100%;
-                    max-width: 1600px;
-                    margin: 0 auto;
+                    height: 100vh;
                     overflow-y: auto;
+                    align-content: flex-start;
+                    justify-content: center;
                 }
                 .video-wrapper {
                     position: relative;
-                    min-height: 300px;
                     background: #111827;
                     border-radius: 16px;
                     overflow: hidden;
                     border: 2px solid rgba(255,255,255,0.05);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
                 }
-                .video-wrapper video {
+                /* Pinned Video Styles */
+                .video-wrapper.pinned {
+                    width: 100%;
+                    height: calc(100vh - 300px); /* Fill most of screen */
+                    min-height: 300px;
+                    order: 1; /* Always first */
+                    cursor: default;
+                }
+                .video-wrapper.pinned video {
                     width: 100% !important;
                     height: 100% !important;
-                    object-fit: contain !important;
+                    object-fit: contain !important; /* Prevent zooming */
                     background: #000;
                 }
-                .video-wrapper.local {
+                
+                /* Thumbnail Styles */
+                .video-wrapper.thumbnail {
+                    width: 120px;
+                    height: 160px;
+                    order: 2; /* Always after pinned */
+                    opacity: 0.8;
+                }
+                .video-wrapper.thumbnail:hover {
+                    opacity: 1;
+                    transform: translateY(-4px);
                     border-color: rgba(59, 130, 246, 0.5);
                 }
+                .video-wrapper.thumbnail video {
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: cover !important; /* Crop thumbnails to look neat */
+                    background: #000;
+                }
+
+                /* Mirror Local Video Only When Front Camera */
+                .video-wrapper.local.mirror video {
+                    transform: rotateY(180deg);
+                }
+
                 .participant-label {
                     position: absolute;
                     bottom: 12px;
@@ -367,6 +407,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                     font-size: 12px;
                     font-weight: 600;
                     border: 1px solid rgba(255,255,255,0.1);
+                    pointer-events: none;
                 }
                 .controls {
                     position: fixed;
@@ -403,23 +444,29 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .control-btn.active { background: #ef4444; }
                 
                 @media (max-width: 640px) {
-                    .video-grid { grid-template-columns: 1fr; padding-top: 100px; }
+                    .video-wrapper.pinned {
+                        height: calc(100vh - 280px);
+                    }
+                    .video-wrapper.thumbnail {
+                        width: 90px;
+                        height: 120px;
+                    }
                     .controls { width: 90%; gap: 10px; padding: 12px; }
                     .control-btn { width: 44px; height: 44px; }
                 }
             `}</style>
 
             {/* Header */}
-            <div className="absolute top-0 inset-x-0 p-6 z-[1050] flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
-                <button onClick={leaveCall} className="flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
+            <div className="absolute top-0 inset-x-0 p-6 z-[1050] flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+                <button onClick={leaveCall} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
                     <ChevronLeft className="w-5 h-5" />
                     <span className="font-medium">Leave Call</span>
                 </button>
-                <div className="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl backdrop-blur-md border border-blue-500/20 font-bold text-sm tracking-wide flex items-center gap-2">
+                <div className="pointer-events-auto bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl backdrop-blur-md border border-blue-500/20 font-bold text-sm tracking-wide flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${callStatus === 'connected' ? 'bg-green-500' : callStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
                     {callStatus === 'connecting' ? 'CONNECTING...' : callStatus === 'connected' ? `TELEHEALTH ROOM` : 'DISCONNECTED'}
                 </div>
-                <button onClick={copyRoomId} className="flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
+                <button onClick={copyRoomId} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
                     <UserPlus className="w-5 h-5" />
                     <span className="hidden sm:inline">Add Participant</span>
                 </button>
@@ -435,7 +482,10 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             {/* Video Grid */}
             <div className="video-grid">
                 {/* Local User */}
-                <div className="video-wrapper local">
+                <div 
+                    className={`video-wrapper local ${pinnedParticipantId === 'local' ? 'pinned' : 'thumbnail'} ${facingMode === 'user' ? 'mirror' : ''}`}
+                    onClick={() => setPinnedParticipantId('local')}
+                >
                     <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
                     {isVideoOff && (
                         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
@@ -447,31 +497,34 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
                 {/* Remote Participants */}
                 {remoteParticipants.map(participant => (
-                    <RemoteParticipantView key={participant.sid} participant={participant} />
+                    <RemoteParticipantView 
+                        key={participant.sid} 
+                        participant={participant} 
+                        isPinned={pinnedParticipantId === participant.sid}
+                        onClick={() => setPinnedParticipantId(participant.sid)}
+                    />
                 ))}
 
                 {/* Empty State */}
                 {remoteParticipants.length === 0 && callStatus === 'connected' && (
-                    <div className="video-wrapper flex items-center justify-center border-dashed border-white/10">
-                        <div className="text-center p-8">
-                            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                                <span className="text-3xl">📡</span>
+                    <div className="video-wrapper thumbnail flex items-center justify-center border-dashed border-white/10 cursor-default" style={{ opacity: 0.5 }}>
+                        <div className="text-center p-4">
+                            <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2 animate-pulse">
+                                <span className="text-lg">📡</span>
                             </div>
-                            <h3 className="text-white/40 font-medium">Waiting for participants...</h3>
-                            <p className="text-white/20 text-xs mt-2">The other party will join automatically</p>
+                            <p className="text-white/20 text-[10px]">Waiting...</p>
                         </div>
                     </div>
                 )}
 
                 {/* Connecting State */}
                 {callStatus === 'connecting' && (
-                    <div className="video-wrapper flex items-center justify-center">
-                        <div className="text-center p-8">
-                            <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
-                                <span className="text-3xl">🔄</span>
+                    <div className="video-wrapper thumbnail flex items-center justify-center cursor-default">
+                        <div className="text-center p-4">
+                            <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-2 animate-spin">
+                                <span className="text-lg">🔄</span>
                             </div>
-                            <h3 className="text-white/60 font-medium">Connecting to Twilio Video...</h3>
-                            <p className="text-white/30 text-xs mt-2">Setting up secure connection</p>
+                            <p className="text-white/30 text-[10px]">Connecting...</p>
                         </div>
                     </div>
                 )}
