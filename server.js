@@ -89,6 +89,20 @@ app.prepare().then(() => {
             }
         });
 
+        // Incoming Video Call Pop-ups
+        socket.on('incoming_video_call', (data) => {
+            if (data.recipientId) {
+                console.log(`Routing incoming call to ${data.recipientId} from ${data.callerName}`);
+                io.to(data.recipientId).emit('incoming_video_call', data);
+            }
+        });
+
+        socket.on('decline_video_call', (data) => {
+            if (data.callerId) {
+                io.to(data.callerId).emit('cancel_video_call', data);
+            }
+        });
+
         // WebRTC Signaling
         socket.on('call-invite', (data) => {
             const { to, from, name, roomId } = data;
