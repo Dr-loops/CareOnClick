@@ -47,27 +47,36 @@ export default function CommunicationHub({
         }
     }, [selectedTarget]);
 
+    const [videoRoomName, setVideoRoomName] = useState(null);
+
     const handleSelectVideoMethod = async (method) => {
         setIsVideoModalOpen(false);
 
-        if (method === VIDEO_METHODS.MEET) {
-            const link = await VideoCallService.startMeetSession();
-            window.open(link, '_blank');
+        if (method === VIDEO_METHODS.TWILIO) {
+            if (!selectedTarget) return alert("Select a recipient first");
 
-            // Send link to target via Socket & Message
-            if (selectedTarget) {
-                const socket = getSocket();
-                const content = `Hello ${selectedTarget.name}, I have started a secure Google Meet session for our consultation. Please join here: ${link}`;
+            // Generate a deterministic room name for this pair
+            const roomName = VideoCallService.getRoomName(user.id, selectedTarget.id);
+            setVideoRoomName(roomName);
+            setShowVideoConsultation(true);
 
-                if (socket) {
-                    socket.emit('send_message', {
+            // Notify the other party via message API (triggers OneSignal push)
+            try {
+                await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
                         recipientId: selectedTarget.id,
+                        recipientName: selectedTarget.name,
+                        content: `${user.name} has started a secure video consultation. Please go to your dashboard to join.`,
+                        type: 'CHAT',
                         senderId: user.id,
                         senderName: user.name,
-                        content: content,
-                        type: 'CHAT'
-                    });
-                }
+                        role: user.role
+                    })
+                });
+            } catch (e) {
+                console.error("Failed to notify recipient:", e);
             }
         } else if (method === VIDEO_METHODS.WHATSAPP) {
             const number = selectedTarget?.whatsappNumber || selectedTarget?.phoneNumber;
@@ -78,16 +87,10 @@ export default function CommunicationHub({
                 alert("No WhatsApp number found for this person.");
             }
         } else {
-            // Default: CareOnClick Video
-            const socket = getSocket();
-            if (socket && selectedTarget) {
-                socket.emit('call-invite', {
-                    to: selectedTarget.id,
-                    from: user.id,
-                    name: user.name,
-                    roomId: user.id
-                });
-            }
+            // Fallback: open Twilio Video
+            if (!selectedTarget) return;
+            const roomName = VideoCallService.getRoomName(user.id, selectedTarget.id);
+            setVideoRoomName(roomName);
             setShowVideoConsultation(true);
         }
     };
@@ -215,7 +218,7 @@ export default function CommunicationHub({
                         <Button variant="danger" onClick={() => setShowVideoConsultation(false)}>Close Video</Button>
                     </div>
                     {/* Pass User to join room with correct ID */}
-                    <VideoConsultation roomId={selectedTargetId} user={user} />
+                    <VideoConsultation roomId={videoRoomName || selectedTargetId} user={user} />
                 </div>
             ) : (
                 <div className="comm-hub-grid">
@@ -279,7 +282,7 @@ export default function CommunicationHub({
                             >
                                 <div style={{ marginBottom: '0.75rem', fontSize: '2.5rem', transition: 'transform 0.3s' }} className="group-hover:rotate-12">📹</div>
                                 <div style={{ fontWeight: '800', color: '#3730a3', fontSize: '1.1rem' }}>Digital Consultation Center</div>
-                                <div style={{ fontSize: '0.8rem', color: '#4338ca', marginTop: '0.25rem' }}>Meet • WhatsApp • Secure Video</div>
+                                <div style={{ fontSize: '0.8rem', color: '#4338ca', marginTop: '0.25rem' }}>Twilio Video • WhatsApp</div>
                             </Card>
 
                             {/* Mobile Call (Kept for voice only fallback) */}
@@ -389,7 +392,7 @@ export default function CommunicationHub({
             {showVideoConsultation && selectedTarget && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999 }}>
                     <VideoConsultation
-                        roomId={user.id}
+                        roomId={videoRoomName || user.id}
                         user={user}
                     />
                     <button

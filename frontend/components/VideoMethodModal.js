@@ -1,6 +1,6 @@
 import React from 'react';
-import { Video, Phone, X } from 'lucide-react';
-import { VideoCallService, VIDEO_METHODS } from '@/lib/videoService';
+import { Video, Phone, X, Shield } from 'lucide-react';
+import { VIDEO_METHODS } from '@/lib/videoService';
 
 const VideoMethodModal = ({ isOpen, onClose, onSelectMethod }) => {
     if (!isOpen) return null;
@@ -20,15 +20,19 @@ const VideoMethodModal = ({ isOpen, onClose, onSelectMethod }) => {
 
                 <div className="p-6 space-y-4">
                     <button
-                        onClick={() => onSelectMethod(VIDEO_METHODS.MEET)}
+                        onClick={() => onSelectMethod(VIDEO_METHODS.TWILIO)}
                         className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 transition-all group"
                     >
                         <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             <Video size={24} />
                         </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-slate-800">Google Meet</h4>
-                            <p className="text-sm text-slate-500">Secure, professional video conferencing</p>
+                        <div className="text-left flex-1">
+                            <h4 className="font-bold text-slate-800">Secure Video Call</h4>
+                            <p className="text-sm text-slate-500">HD video & audio · HIPAA-ready</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                            <Shield size={12} />
+                            <span>Encrypted</span>
                         </div>
                     </button>
 
@@ -44,23 +48,10 @@ const VideoMethodModal = ({ isOpen, onClose, onSelectMethod }) => {
                             <p className="text-sm text-slate-500">Quick and easy mobile connection</p>
                         </div>
                     </button>
-
-                    <button
-                        onClick={() => onSelectMethod(VIDEO_METHODS.PORTAL)}
-                        className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-slate-100 hover:border-amber-500 hover:bg-amber-50 transition-all group"
-                    >
-                        <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-colors">
-                            <Video size={24} />
-                        </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-slate-800">In-Portal Video (Beta)</h4>
-                            <p className="text-sm text-slate-500">Built-in telemedicine room</p>
-                        </div>
-                    </button>
                 </div>
 
                 <div className="bg-slate-50 p-4 text-center text-xs text-slate-400">
-                    Both parties will receive the connection link immediately.
+                    Both parties will be connected to the same secure session.
                 </div>
             </div>
         </div>

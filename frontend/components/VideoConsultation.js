@@ -1,211 +1,302 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSocket } from '@/lib/socket';
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, ChevronLeft, UserPlus, Camera } from 'lucide-react';
-import Button from '@/components/ui/Button';
 
-// STUN servers for NAT traversal
-const ICE_SERVERS = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-    ]
-};
-
+/**
+ * VideoConsultation — Twilio Video powered telehealth component.
+ * Props:
+ *   - roomId:  unique room identifier (used as Twilio room name)
+ *   - user:    session user object ({ id, name, ... })
+ */
 const VideoConsultation = ({ roomId, user }) => {
     const router = useRouter();
-    const [localStream, setLocalStream] = useState(null);
-    const [remoteStreams, setRemoteStreams] = useState([]); // Array of { socketId, stream, name }
-    const [callStatus, setCallStatus] = useState('connecting'); // connecting, connected, ended
+
+    // State
+    const [room, setRoom] = useState(null);
+    const [localTracks, setLocalTracks] = useState([]);
+    const [remoteParticipants, setRemoteParticipants] = useState([]);
+    const [callStatus, setCallStatus] = useState('connecting'); // connecting | connected | ended
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [isCameraSwitching, setIsCameraSwitching] = useState(false);
+    const [error, setError] = useState(null);
 
-    const socketRef = useRef();
-    const peersRef = useRef({}); // { socketId: RTCPeerConnection }
     const localVideoRef = useRef();
+    const roomRef = useRef(null);
 
-    // 1. Initialize Media
-    const startLocalStream = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            setLocalStream(stream);
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = stream;
-            }
-            return stream;
-        } catch (err) {
-            console.error("Media Access Error:", err);
-            alert("Could not access camera/microphone. Please check permissions.");
-            return null;
+    // ── Attach a track to a DOM element ──
+    const attachTrack = useCallback((track, element) => {
+        if (element && track) {
+            // Clear any previous children
+            element.innerHTML = '';
+            element.appendChild(track.attach());
         }
-    };
+    }, []);
 
-    // 2. WebRTC Logic: Create Peer Connection
-    const createPeer = (targetSocketId, stream) => {
-        const peer = new RTCPeerConnection(ICE_SERVERS);
+    // ── Connect to Twilio Video Room ──
+    useEffect(() => {
+        let cancelled = false;
 
-        // Add local tracks to peer
-        stream.getTracks().forEach(track => peer.addTrack(track, stream));
+        const connect = async () => {
+            try {
+                setCallStatus('connecting');
+                setError(null);
 
-        // When we get remote tracks
-        peer.ontrack = (event) => {
-            console.log(`[WebRTC] Received remote track from ${targetSocketId}`);
-            setRemoteStreams(prev => {
-                // Prevent duplicate streams for the same user
-                if (prev.find(s => s.socketId === targetSocketId)) return prev;
-                return [...prev, { socketId: targetSocketId, stream: event.streams[0], name: 'Participant' }];
-            });
-        };
+                // 1. Dynamically import twilio-video (client-side only)
+                const Video = await import('twilio-video');
 
-        // When we get local ICE candidates, send them to the peer
-        peer.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current.emit('webrtc-ice-candidate', {
-                    to: targetSocketId,
-                    candidate: event.candidate
+                // 2. Fetch an access token from our API
+                const res = await fetch('/api/twilio-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomName: roomId }),
                 });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || 'Failed to get video token');
+                }
+
+                const { token } = await res.json();
+
+                if (cancelled) return;
+
+                // 3. Connect to the room
+                const twilioRoom = await Video.connect(token, {
+                    name: roomId,
+                    audio: true,
+                    video: { width: 1280, height: 720 },
+                    dominantSpeaker: true,
+                    networkQuality: { local: 1, remote: 1 },
+                });
+
+                if (cancelled) {
+                    twilioRoom.disconnect();
+                    return;
+                }
+
+                roomRef.current = twilioRoom;
+                setRoom(twilioRoom);
+                setCallStatus('connected');
+
+                // 4. Attach local tracks
+                const localTracksList = Array.from(twilioRoom.localParticipant.tracks.values())
+                    .map(pub => pub.track)
+                    .filter(Boolean);
+                setLocalTracks(localTracksList);
+
+                // Attach local video to the ref
+                const localVideoTrack = localTracksList.find(t => t.kind === 'video');
+                if (localVideoTrack && localVideoRef.current) {
+                    attachTrack(localVideoTrack, localVideoRef.current);
+                }
+
+                // 5. Handle existing remote participants
+                twilioRoom.participants.forEach(participant => {
+                    handleParticipantConnected(participant);
+                });
+
+                // 6. Listen for new participants
+                twilioRoom.on('participantConnected', handleParticipantConnected);
+                twilioRoom.on('participantDisconnected', handleParticipantDisconnected);
+                twilioRoom.on('disconnected', () => {
+                    setCallStatus('ended');
+                });
+
+                console.log(`[Twilio Video] Connected to room: ${roomId}`);
+
+            } catch (err) {
+                console.error('[Twilio Video] Connection error:', err);
+                setError(err.message);
+                setCallStatus('ended');
             }
         };
 
-        return peer;
-    };
+        // ── Participant handlers ──
+        const handleParticipantConnected = (participant) => {
+            console.log(`[Twilio Video] Participant connected: ${participant.identity}`);
 
-    // 3. Coordinate Signaling
-    useEffect(() => {
-        const socket = getSocket();
-        if (!socket) return;
-        socketRef.current = socket;
-
-        const init = async () => {
-            const stream = await startLocalStream();
-            if (!stream) return;
-
-            setCallStatus('connected');
-            socket.emit('join-video-room', roomId);
-
-            // A new user joined -> Initiate an offer to them
-            socket.on('user-joined', async ({ userId }) => {
-                console.log(`[Signaling] New user joined: ${userId}. Creating offer...`);
-                const peer = createPeer(userId, stream);
-                peersRef.current[userId] = peer;
-
-                const offer = await peer.createOffer();
-                await peer.setLocalDescription(offer);
-                socket.emit('webrtc-offer', { to: userId, offer });
+            setRemoteParticipants(prev => {
+                if (prev.find(p => p.sid === participant.sid)) return prev;
+                return [...prev, participant];
             });
 
-            // Received an offer -> Create an answer
-            socket.on('webrtc-offer', async ({ from, offer }) => {
-                console.log(`[Signaling] Received offer from ${from}. Creating answer...`);
-                const peer = createPeer(from, stream);
-                peersRef.current[from] = peer;
-
-                await peer.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await peer.createAnswer();
-                await peer.setLocalDescription(answer);
-                socket.emit('webrtc-answer', { to: from, answer });
-            });
-
-            // Received an answer -> Set remote description
-            socket.on('webrtc-answer', async ({ from, answer }) => {
-                console.log(`[Signaling] Received answer from ${from}. Finalizing connection...`);
-                const peer = peersRef.current[from];
-                if (peer) {
-                    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+            // Subscribe to their existing tracks
+            participant.tracks.forEach(publication => {
+                if (publication.isSubscribed && publication.track) {
+                    // Track is already available
                 }
             });
 
-            // Received ICE Candidate -> Add it
-            socket.on('webrtc-ice-candidate', async ({ from, candidate }) => {
-                const peer = peersRef.current[from];
-                if (peer) {
-                    await peer.addIceCandidate(new RTCIceCandidate(candidate));
-                }
+            // Listen for new track subscriptions
+            participant.on('trackSubscribed', () => {
+                // Force re-render so the track ref can attach
+                setRemoteParticipants(prev => [...prev]);
             });
 
-            // User left -> Clean up
-            socket.on('user-left', ({ userId }) => {
-                console.log(`[Signaling] User ${userId} left the call.`);
-                if (peersRef.current[userId]) {
-                    peersRef.current[userId].close();
-                    delete peersRef.current[userId];
-                }
-                setRemoteStreams(prev => prev.filter(s => s.socketId !== userId));
+            participant.on('trackUnsubscribed', () => {
+                setRemoteParticipants(prev => [...prev]);
             });
         };
 
-        init();
+        const handleParticipantDisconnected = (participant) => {
+            console.log(`[Twilio Video] Participant disconnected: ${participant.identity}`);
+            setRemoteParticipants(prev => prev.filter(p => p.sid !== participant.sid));
+        };
+
+        connect();
 
         return () => {
-            console.log("Terminating Video Session...");
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
+            cancelled = true;
+            if (roomRef.current) {
+                roomRef.current.localParticipant.tracks.forEach(pub => {
+                    if (pub.track) {
+                        pub.track.stop();
+                        pub.unpublish();
+                    }
+                });
+                roomRef.current.disconnect();
+                roomRef.current = null;
             }
-            Object.values(peersRef.current).forEach(peer => peer.close());
-            socket.emit('leave-call', { roomId });
-            socket.off('user-joined');
-            socket.off('webrtc-offer');
-            socket.off('webrtc-answer');
-            socket.off('webrtc-ice-candidate');
-            socket.off('user-left');
         };
-    }, [roomId]);
+    }, [roomId, attachTrack]);
 
-    // 4. Call Controls
+    // ── Call Controls ──
     const toggleMute = () => {
-        if (localStream) {
-            localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
-            setIsMuted(!localStream.getAudioTracks()[0].enabled);
-        }
+        if (!roomRef.current) return;
+        roomRef.current.localParticipant.audioTracks.forEach(pub => {
+            if (isMuted) {
+                pub.track.enable();
+            } else {
+                pub.track.disable();
+            }
+        });
+        setIsMuted(!isMuted);
     };
 
     const toggleVideo = () => {
-        if (localStream) {
-            localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
-            setIsVideoOff(!localStream.getVideoTracks()[0].enabled);
-        }
+        if (!roomRef.current) return;
+        roomRef.current.localParticipant.videoTracks.forEach(pub => {
+            if (isVideoOff) {
+                pub.track.enable();
+            } else {
+                pub.track.disable();
+            }
+        });
+        setIsVideoOff(!isVideoOff);
     };
 
     const toggleCamera = async () => {
-        if (!localStream) return;
+        if (!roomRef.current) return;
         setIsCameraSwitching(true);
         try {
-            const currentFacingMode = localStream.getVideoTracks()[0].getSettings().facingMode;
+            const Video = await import('twilio-video');
+            const currentVideoTrack = Array.from(roomRef.current.localParticipant.videoTracks.values())[0]?.track;
+            if (!currentVideoTrack) return;
+
+            const currentFacingMode = currentVideoTrack.mediaStreamTrack.getSettings().facingMode;
             const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
 
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacingMode },
-                audio: true
+            // Create new video track
+            const newTrack = await Video.createLocalVideoTrack({
+                facingMode: newFacingMode,
+                width: 1280,
+                height: 720,
             });
 
-            // Replace tracks in all peer connections
-            Object.values(peersRef.current).forEach(peer => {
-                const videoTrack = newStream.getVideoTracks()[0];
-                const sender = peer.getSenders().find(s => s.track.kind === 'video');
-                if (sender) sender.replaceTrack(videoTrack);
-            });
+            // Unpublish old, publish new
+            roomRef.current.localParticipant.unpublishTrack(currentVideoTrack);
+            currentVideoTrack.stop();
+            roomRef.current.localParticipant.publishTrack(newTrack);
 
-            // Stop old stream and update UI
-            localStream.getTracks().forEach(t => t.stop());
-            setLocalStream(newStream);
-            if (localVideoRef.current) localVideoRef.current.srcObject = newStream;
+            // Update local preview
+            if (localVideoRef.current) {
+                attachTrack(newTrack, localVideoRef.current);
+            }
+
+            setLocalTracks(prev => prev.map(t => t.kind === 'video' ? newTrack : t));
         } catch (e) {
-            console.error("Camera Switch Failed:", e);
+            console.error('[Twilio Video] Camera Switch Failed:', e);
         } finally {
             setIsCameraSwitching(false);
         }
     };
 
     const leaveCall = () => {
+        if (roomRef.current) {
+            roomRef.current.localParticipant.tracks.forEach(pub => {
+                if (pub.track) {
+                    pub.track.stop();
+                    pub.unpublish();
+                }
+            });
+            roomRef.current.disconnect();
+            roomRef.current = null;
+        }
+        setCallStatus('ended');
         router.back();
     };
 
     const copyRoomId = () => {
         navigator.clipboard.writeText(roomId);
         alert("Room ID copied to clipboard. Share it with participants!");
+    };
+
+    // ── Render helper for remote participant video ──
+    const RemoteParticipantView = ({ participant }) => {
+        const videoRef = useRef();
+        const audioRef = useRef();
+
+        useEffect(() => {
+            const attachTracks = () => {
+                participant.tracks.forEach(publication => {
+                    if (publication.isSubscribed && publication.track) {
+                        if (publication.track.kind === 'video' && videoRef.current) {
+                            videoRef.current.innerHTML = '';
+                            videoRef.current.appendChild(publication.track.attach());
+                        }
+                        if (publication.track.kind === 'audio' && audioRef.current) {
+                            audioRef.current.innerHTML = '';
+                            audioRef.current.appendChild(publication.track.attach());
+                        }
+                    }
+                });
+            };
+
+            attachTracks();
+
+            const onTrackSubscribed = (track) => {
+                if (track.kind === 'video' && videoRef.current) {
+                    videoRef.current.innerHTML = '';
+                    videoRef.current.appendChild(track.attach());
+                }
+                if (track.kind === 'audio' && audioRef.current) {
+                    audioRef.current.innerHTML = '';
+                    audioRef.current.appendChild(track.attach());
+                }
+            };
+
+            const onTrackUnsubscribed = (track) => {
+                track.detach().forEach(el => el.remove());
+            };
+
+            participant.on('trackSubscribed', onTrackSubscribed);
+            participant.on('trackUnsubscribed', onTrackUnsubscribed);
+
+            return () => {
+                participant.off('trackSubscribed', onTrackSubscribed);
+                participant.off('trackUnsubscribed', onTrackUnsubscribed);
+            };
+        }, [participant]);
+
+        return (
+            <div className="video-wrapper">
+                <div ref={videoRef} style={{ width: '100%', height: '100%' }} />
+                <div ref={audioRef} style={{ display: 'none' }} />
+                <div className="participant-label">{participant.identity || 'Guest'}</div>
+            </div>
+        );
     };
 
     return (
@@ -231,13 +322,15 @@ const VideoConsultation = ({ roomId, user }) => {
                     border: 2px solid rgba(255,255,255,0.05);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
                 }
-                .video-wrapper.local {
-                    border-color: rgba(59, 130, 246, 0.5);
-                }
-                video {
+                .video-wrapper video {
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
+                }
+                .video-wrapper.local {
+                    border-color: rgba(59, 130, 246, 0.5);
+                }
+                .video-wrapper.local video {
                     transform: rotateY(180deg);
                 }
                 .participant-label {
@@ -301,8 +394,8 @@ const VideoConsultation = ({ roomId, user }) => {
                     <span className="font-medium">Leave Call</span>
                 </button>
                 <div className="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl backdrop-blur-md border border-blue-500/20 font-bold text-sm tracking-wide flex items-center gap-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    TELEHEALTH ROOM: {roomId}
+                    <span className={`w-2 h-2 rounded-full ${callStatus === 'connected' ? 'bg-green-500' : callStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                    {callStatus === 'connecting' ? 'CONNECTING...' : callStatus === 'connected' ? `TELEHEALTH ROOM` : 'DISCONNECTED'}
                 </div>
                 <button onClick={copyRoomId} className="flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
                     <UserPlus className="w-5 h-5" />
@@ -310,46 +403,59 @@ const VideoConsultation = ({ roomId, user }) => {
                 </button>
             </div>
 
+            {/* Error State */}
+            {error && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1060] bg-red-600/20 text-red-300 px-6 py-3 rounded-xl border border-red-500/30 backdrop-blur-md text-sm max-w-md text-center">
+                    ⚠️ {error}
+                </div>
+            )}
+
             {/* Video Grid */}
             <div className="video-grid">
                 {/* Local User */}
                 <div className="video-wrapper local">
-                    <video ref={localVideoRef} autoPlay playsInline muted />
+                    <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
                     {isVideoOff && (
                         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
                             <VideoOff className="w-16 h-16 text-gray-700" />
                         </div>
                     )}
-                    <div className="participant-label">You (Local)</div>
+                    <div className="participant-label">You ({user?.name || 'Local'})</div>
                 </div>
 
-                {/* Remote Users */}
-                {remoteStreams.map(({ socketId, stream, name }) => (
-                    <div key={socketId} className="video-wrapper">
-                        <video
-                            autoPlay
-                            playsInline
-                            ref={el => { if (el) el.srcObject = stream; }}
-                        />
-                        <div className="participant-label">{name || 'Guest'}</div>
-                    </div>
+                {/* Remote Participants */}
+                {remoteParticipants.map(participant => (
+                    <RemoteParticipantView key={participant.sid} participant={participant} />
                 ))}
 
                 {/* Empty State */}
-                {remoteStreams.length === 0 && (
+                {remoteParticipants.length === 0 && callStatus === 'connected' && (
                     <div className="video-wrapper flex items-center justify-center border-dashed border-white/10">
                         <div className="text-center p-8">
                             <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                                 <span className="text-3xl">📡</span>
                             </div>
                             <h3 className="text-white/40 font-medium">Waiting for participants...</h3>
-                            <p className="text-white/20 text-xs mt-2">Share Room ID with your consultant</p>
+                            <p className="text-white/20 text-xs mt-2">The other party will join automatically</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Connecting State */}
+                {callStatus === 'connecting' && (
+                    <div className="video-wrapper flex items-center justify-center">
+                        <div className="text-center p-8">
+                            <div className="w-20 h-20 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
+                                <span className="text-3xl">🔄</span>
+                            </div>
+                            <h3 className="text-white/60 font-medium">Connecting to Twilio Video...</h3>
+                            <p className="text-white/30 text-xs mt-2">Setting up secure connection</p>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Final Controls */}
+            {/* Controls */}
             <div className="controls">
                 <button
                     onClick={toggleMute}

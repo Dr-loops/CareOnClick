@@ -1,64 +1,48 @@
 /**
  * VideoCallService
- * Centralizes logic for initiating video calls via different providers (Meet, WhatsApp)
+ * Centralizes logic for initiating video calls via different providers (Twilio, WhatsApp)
  */
 
 export const VIDEO_METHODS = {
-    MEET: 'meet',
+    TWILIO: 'twilio',
     WHATSAPP: 'whatsapp',
-    PORTAL: 'portal',
     AUTO: 'auto'
 };
 
 export const VideoCallService = {
     /**
      * Determines the best method based on preference and availability
-     * @param {Object} userPreference - User's preferred method
-     * @param {String} targetWhatsapp - Target user's WhatsApp number (if any)
-     * @returns {String} 'meet' or 'whatsapp'
+     * @param {string} userPreference - User's preferred method
+     * @param {string} targetWhatsapp - Target user's WhatsApp number (if any)
+     * @returns {string} 'twilio' or 'whatsapp'
      */
     determineMethod: (userPreference, targetWhatsapp) => {
         if (userPreference === VIDEO_METHODS.WHATSAPP && targetWhatsapp) {
             return VIDEO_METHODS.WHATSAPP;
         }
-        if (userPreference === VIDEO_METHODS.MEET) {
-            return VIDEO_METHODS.MEET;
+        if (userPreference === VIDEO_METHODS.TWILIO) {
+            return VIDEO_METHODS.TWILIO;
         }
-        // Auto logic: Prefer WhatsApp if number exists, else Meet
-        if (userPreference === VIDEO_METHODS.AUTO) {
-            return targetWhatsapp ? VIDEO_METHODS.WHATSAPP : VIDEO_METHODS.MEET;
-        }
-        return VIDEO_METHODS.MEET; // Default fallback
+        // Auto logic: Default to Twilio for professional consultations
+        return VIDEO_METHODS.TWILIO;
     },
 
     /**
-     * Initiates a Google Meet session 
-     * @returns {Promise<String>} Meet Link
+     * Generates a deterministic room name from two user IDs
+     * Ensures both users always get the same room name regardless of who initiates
+     * @param {string} userId1
+     * @param {string} userId2
+     * @returns {string} Room name
      */
-    startMeetSession: async (attendees = []) => {
-        try {
-            console.log(`[Video] Starting Meet session for attendees: ${attendees.join(', ')}`);
-            const res = await fetch('/api/meet', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    topic: 'Virtual Hospital Consultation',
-                    startTime: new Date().toISOString(),
-                    attendees: attendees
-                })
-            });
-            const data = await res.json();
-            return data.link || "https://meet.google.com/oew-uyne-rbb";
-        } catch (e) {
-            console.error("Failed to create meet:", e);
-            return "https://meet.google.com/oew-uyne-rbb"; // Fallback
-        }
+    getRoomName: (userId1, userId2) => {
+        const sorted = [userId1, userId2].sort();
+        return `consult-${sorted[0].slice(-6)}-${sorted[1].slice(-6)}`;
     },
 
     /**
      * Generates a WhatsApp deep link
-     * @param {String} number - E.164 formatted number
-     * @returns {String} Deep link
+     * @param {string} number - E.164 formatted number
+     * @returns {string|null} Deep link
      */
     getWhatsAppLink: (number) => {
         if (!number) return null;
