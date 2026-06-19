@@ -75,7 +75,11 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 const twilioRoom = await Video.connect(token, {
                     name: roomId,
                     audio: true,
-                    video: { width: 1280, height: 720 },
+                    video: { 
+                        width: { ideal: 1920 }, 
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 30, max: 60 }
+                    },
                     dominantSpeaker: true,
                     networkQuality: { local: 1, remote: 1 },
                 });
@@ -211,8 +215,9 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             // Create new video track
             const newTrack = await Video.createLocalVideoTrack({
                 facingMode: newFacingMode,
-                width: 1280,
-                height: 720,
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: { ideal: 30, max: 60 }
             });
 
             // Unpublish old, publish new
@@ -350,9 +355,6 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .video-wrapper.local {
                     border-color: rgba(59, 130, 246, 0.5);
                 }
-                .video-wrapper.local.mirror video {
-                    transform: rotateY(180deg);
-                }
                 .participant-label {
                     position: absolute;
                     bottom: 12px;
@@ -433,7 +435,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             {/* Video Grid */}
             <div className="video-grid">
                 {/* Local User */}
-                <div className={`video-wrapper local ${facingMode === 'user' ? 'mirror' : ''}`}>
+                <div className="video-wrapper local">
                     <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
                     {isVideoOff && (
                         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
