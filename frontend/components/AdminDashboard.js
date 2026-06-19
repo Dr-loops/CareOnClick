@@ -2997,17 +2997,11 @@ export default function AdminDashboard({ user }) {
 
             {/* GLOBAL VIDEO MODALS */}
             {showVideoConsultation && selectedVideoTarget && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: 'black' }}>
-                    <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10000 }}>
-                        <button
-                            onClick={() => setShowVideoConsultation(false)}
-                            style={{ padding: '10px 24px', background: colors.danger, color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                        >
-                            End Session
-                        </button>
-                    </div>
-                    <VideoConsultation roomId={user.id} user={user} />
-                </div>
+                <VideoConsultation
+                    roomId={user.id}
+                    user={user}
+                    onLeave={() => setShowVideoConsultation(false)}
+                />
             )}
 
             <VideoMethodModal

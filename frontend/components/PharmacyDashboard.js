@@ -861,19 +861,20 @@ export default function PharmacyDashboard({ user }) {
                 {
                     activeTab === 'telepharmacy' && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '2rem' }}>
-                            {showVideoCall ? (
-                                <div className="glass-card" style={{ height: '500px', overflow: 'hidden', padding: 0 }}>
-                                    <VideoConsultation user={user} patientId={selectedPatientId || 'PATH-GENERAL'} />
-                                    <button onClick={() => setShowVideoCall(false)} className="btn btn-secondary" style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 50 }}>Close Call</button>
-                                </div>
-                            ) : (
-                                <div className="glass-card" style={{ background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '450px' }}>
-                                    <div style={{ fontSize: '4rem' }}>🎧</div>
-                                    <h3>Telepharmacy Console</h3>
-                                    <p style={{ opacity: 0.7 }}>Secure video link for medication counseling or renewals.</p>
-                                    <button className="btn btn-primary" style={{ padding: '1rem 2rem', background: '#3b82f6', border: 'none' }} onClick={() => setShowVideoCall(true)}>Go Online (Start Video)</button>
-                                </div>
+                            {showVideoCall && (
+                                <VideoConsultation
+                                    roomId={selectedPatientId || 'PATH-GENERAL'}
+                                    user={user}
+                                    onLeave={() => setShowVideoCall(false)}
+                                />
                             )}
+                            
+                            <div className="glass-card" style={{ background: '#0f172a', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '450px' }}>
+                                <div style={{ fontSize: '4rem' }}>🎧</div>
+                                <h3>Telepharmacy Console</h3>
+                                <p style={{ opacity: 0.7 }}>Secure video link for medication counseling or renewals.</p>
+                                <button className="btn btn-primary" style={{ padding: '1rem 2rem', background: '#3b82f6', border: 'none' }} onClick={() => setShowVideoCall(true)}>Go Online (Start Video)</button>
+                            </div>
 
                             <div className="glass-card">
                                 <h3>Secure Messaging (Direct)</h3>

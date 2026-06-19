@@ -23,6 +23,7 @@ export default function ConsultationPage() {
         <VideoConsultation
             roomId={params.id}
             user={user}
+            onLeave={() => router.push('/dashboard')}
         />
     );
 }

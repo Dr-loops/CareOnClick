@@ -3,14 +3,22 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, ChevronLeft, UserPlus, Camera } from 'lucide-react';
 
+import { createPortal } from 'react-dom';
+
 /**
  * VideoConsultation — Twilio Video powered telehealth component.
  * Props:
  *   - roomId:  unique room identifier (used as Twilio room name)
  *   - user:    session user object ({ id, name, ... })
+ *   - onLeave: optional callback to close the video modal without navigating back
  */
-const VideoConsultation = ({ roomId, user }) => {
+const VideoConsultation = ({ roomId, user, onLeave }) => {
     const router = useRouter();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // State
     const [room, setRoom] = useState(null);
@@ -235,7 +243,11 @@ const VideoConsultation = ({ roomId, user }) => {
             roomRef.current = null;
         }
         setCallStatus('ended');
-        router.back();
+        if (onLeave) {
+            onLeave();
+        } else {
+            router.back();
+        }
     };
 
     const copyRoomId = () => {
@@ -299,7 +311,9 @@ const VideoConsultation = ({ roomId, user }) => {
         );
     };
 
-    return (
+    if (!mounted) return null;
+
+    const content = (
         <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col font-sans overflow-hidden">
             <style jsx>{`
                 .video-grid {
@@ -494,6 +508,8 @@ const VideoConsultation = ({ roomId, user }) => {
             </div>
         </div>
     );
+
+    return createPortal(content, document.body);
 };
 
 export default VideoConsultation;

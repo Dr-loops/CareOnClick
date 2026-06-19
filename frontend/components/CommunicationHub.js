@@ -212,15 +212,7 @@ export default function CommunicationHub({
             <h3>Communication Hub 📨</h3>
             <p style={{ color: '#666', marginBottom: '1.5rem' }}>Connect with patients and staff via multiple channels.</p>
 
-            {showVideoConsultation ? (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, background: 'black' }}>
-                    <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10000 }}>
-                        <Button variant="danger" onClick={() => setShowVideoConsultation(false)}>Close Video</Button>
-                    </div>
-                    {/* Pass User to join room with correct ID */}
-                    <VideoConsultation roomId={videoRoomName || selectedTargetId} user={user} />
-                </div>
-            ) : (
+            {showVideoConsultation ? null : (
                 <div className="comm-hub-grid">
                     <div>
                         <div style={{ marginBottom: '1rem' }}>
@@ -389,19 +381,12 @@ export default function CommunicationHub({
                     </Card>
                 </div>
             )}
-            {showVideoConsultation && selectedTarget && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999 }}>
-                    <VideoConsultation
-                        roomId={videoRoomName || user.id}
-                        user={user}
-                    />
-                    <button
-                        onClick={() => setShowVideoConsultation(false)}
-                        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000, padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
-                    >
-                        Close Video
-                    </button>
-                </div>
+            {showVideoConsultation && (
+                <VideoConsultation
+                    roomId={videoRoomName || (selectedTarget ? selectedTarget.id : user.id)}
+                    user={user}
+                    onLeave={() => setShowVideoConsultation(false)}
+                />
             )}
             <VideoMethodModal
                 isOpen={isVideoModalOpen}

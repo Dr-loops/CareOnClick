@@ -1020,7 +1020,7 @@ export default function NurseDashboard({ user }) {
                 {/* [NEW] Telehealth Tab */}
                 {activeTab === 'telehealth' && (
                     <div style={{ padding: '0 1rem' }}>
-                        <VideoConsultation user={user} patient={selectedPatient} />
+                        <VideoConsultation user={user} roomId={selectedPatient?.id || 'PATH-GENERAL'} onLeave={() => setActiveTab('patients')} />
                     </div>
                 )}
 
