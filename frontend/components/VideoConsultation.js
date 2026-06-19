@@ -331,17 +331,20 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 }
                 .video-wrapper {
                     position: relative;
-                    aspect-ratio: 16/9;
+                    min-height: 300px;
                     background: #111827;
                     border-radius: 16px;
                     overflow: hidden;
                     border: 2px solid rgba(255,255,255,0.05);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
                 .video-wrapper video {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: contain;
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: contain !important;
                     background: #000;
                 }
                 .video-wrapper.local {

@@ -41,7 +41,7 @@ export async function POST(req) {
             TWILIO_API_KEY_SID,
             TWILIO_API_KEY_SECRET,
             {
-                identity: session.user.name || session.user.id,
+                identity: `${session.user.name || session.user.id}-${Math.floor(Math.random() * 10000)}`,
                 ttl: 3600, // 1 hour
             }
         );
