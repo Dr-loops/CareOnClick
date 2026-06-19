@@ -102,10 +102,13 @@ function AuthStateAdapter({ children }) {
     );
 }
 
+import IncomingCallNotification from './IncomingCallNotification';
+
 export function AuthProvider({ children }) {
     return (
         <SessionProvider>
             <AuthStateAdapter>
+                <IncomingCallNotification />
                 {children}
             </AuthStateAdapter>
         </SessionProvider>

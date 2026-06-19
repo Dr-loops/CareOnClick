@@ -60,6 +60,17 @@ export default function CommunicationHub({
             setVideoRoomName(roomName);
             setShowVideoConsultation(true);
 
+            // Emit a real-time socket event for the in-app ringing popup
+            const socket = getSocket();
+            if (socket) {
+                socket.emit('incoming_video_call', {
+                    recipientId: selectedTarget.id,
+                    callerId: user.id,
+                    callerName: user.name,
+                    roomId: roomName
+                });
+            }
+
             // Notify the other party via message API (triggers OneSignal push)
             try {
                 await fetch('/api/messages', {
@@ -68,8 +79,8 @@ export default function CommunicationHub({
                     body: JSON.stringify({
                         recipientId: selectedTarget.id,
                         recipientName: selectedTarget.name,
-                        content: `${user.name} has started a secure video consultation. Please go to your dashboard to join.`,
-                        type: 'CHAT',
+                        content: `${user.name} is calling you for a video consultation.`,
+                        type: 'VIDEO_CALL',
                         senderId: user.id,
                         senderName: user.name,
                         role: user.role

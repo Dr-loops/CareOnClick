@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { notificationService } from '@/lib/notifications';
-import { notifyNewMessage } from '@/lib/onesignal';
+import { notifyNewMessage, notifyIncomingCall } from '@/lib/onesignal';
 
 export async function GET(request) {
     try {
@@ -116,11 +116,23 @@ export async function POST(request) {
         // This ensures device-level popup + sound even if Twilio/email is slow or fails
         if (recipientId) {
             try {
-                const pushResult = await notifyNewMessage({
-                    recipientId,
-                    senderName: resolvedSenderName,
-                    preview: content.length > 80 ? content.slice(0, 77) + '...' : content,
-                });
+                let pushResult;
+                if (type === 'VIDEO_CALL') {
+                    // We parse the roomId from the message content or just direct to dashboard
+                    // But in CommunicationHub we don't pass roomId in the message body natively.
+                    // We'll fallback to dashboard if roomId isn't explicit, or we can extract it if needed.
+                    pushResult = await notifyIncomingCall({
+                        recipientId,
+                        senderName: resolvedSenderName,
+                        roomId: session.user.id // By default, CommunicationHub uses sender.id as room or specific pair id. Let's redirect to dashboard for safety if roomId is complex.
+                    });
+                } else {
+                    pushResult = await notifyNewMessage({
+                        recipientId,
+                        senderName: resolvedSenderName,
+                        preview: content.length > 80 ? content.slice(0, 77) + '...' : content,
+                    });
+                }
                 console.log('[Messages API] OneSignal push result:', JSON.stringify(pushResult));
             } catch (e) {
                 console.error('[OneSignal] Failed to push message notification:', e);

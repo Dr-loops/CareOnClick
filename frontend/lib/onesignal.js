@@ -114,3 +114,15 @@ export async function notifyNewMessage({ recipientId, senderName, preview }) {
         url: '/dashboard',
     });
 }
+
+/**
+ * Convenience: notify a user of an incoming video call
+ */
+export async function notifyIncomingCall({ recipientId, senderName, roomId }) {
+    return sendPushNotification({
+        userIds: [recipientId],
+        title: `📞 Incoming Video Call`,
+        message: `${senderName} is calling you for a video consultation. Tap to answer.`,
+        url: `/consultation/${roomId}`,
+    });
+}
