@@ -130,8 +130,8 @@ export async function POST(request) {
             await notificationService.sendAlert([recipient], content);
         }
 
-        // OneSignal: push for all direct chat/alert messages
-        if (recipientId && type !== 'SMS' && type !== 'EMAIL') {
+        // OneSignal: push for all direct chat/alert/sms messages
+        if (recipientId && type !== 'EMAIL') {
             try {
                 await notifyNewMessage({
                     recipientId,
