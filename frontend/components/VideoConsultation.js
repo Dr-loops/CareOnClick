@@ -28,6 +28,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [isCameraSwitching, setIsCameraSwitching] = useState(false);
+    const [facingMode, setFacingMode] = useState('user');
     const [error, setError] = useState(null);
 
     const localVideoRef = useRef();
@@ -203,8 +204,9 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             const currentVideoTrack = Array.from(roomRef.current.localParticipant.videoTracks.values())[0]?.track;
             if (!currentVideoTrack) return;
 
-            const currentFacingMode = currentVideoTrack.mediaStreamTrack.getSettings().facingMode;
+            const currentFacingMode = currentVideoTrack.mediaStreamTrack.getSettings().facingMode || 'user';
             const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            setFacingMode(newFacingMode);
 
             // Create new video track
             const newTrack = await Video.createLocalVideoTrack({
@@ -339,12 +341,13 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .video-wrapper video {
                     width: 100%;
                     height: 100%;
-                    object-fit: cover;
+                    object-fit: contain;
+                    background: #000;
                 }
                 .video-wrapper.local {
                     border-color: rgba(59, 130, 246, 0.5);
                 }
-                .video-wrapper.local video {
+                .video-wrapper.local.mirror video {
                     transform: rotateY(180deg);
                 }
                 .participant-label {
@@ -427,7 +430,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             {/* Video Grid */}
             <div className="video-grid">
                 {/* Local User */}
-                <div className="video-wrapper local">
+                <div className={`video-wrapper local ${facingMode === 'user' ? 'mirror' : ''}`}>
                     <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
                     {isVideoOff && (
                         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
