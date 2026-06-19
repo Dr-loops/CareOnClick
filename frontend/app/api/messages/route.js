@@ -112,7 +112,22 @@ export async function POST(request) {
             }
         });
 
-        // Trigger Notifications
+        // ── OneSignal Push: fire FIRST for ALL message types ──
+        // This ensures device-level popup + sound even if Twilio/email is slow or fails
+        if (recipientId) {
+            try {
+                const pushResult = await notifyNewMessage({
+                    recipientId,
+                    senderName: resolvedSenderName,
+                    preview: content.length > 80 ? content.slice(0, 77) + '...' : content,
+                });
+                console.log('[Messages API] OneSignal push result:', JSON.stringify(pushResult));
+            } catch (e) {
+                console.error('[OneSignal] Failed to push message notification:', e);
+            }
+        }
+
+        // ── Channel-specific delivery (SMS, Email, Alert) ──
         if (type === 'SMS' && recipient?.phoneNumber) {
             await notificationService.sendSMS(recipient.phoneNumber, `[${resolvedSenderName}] ${content}`);
         }
@@ -128,19 +143,6 @@ export async function POST(request) {
 
         if (type === 'ALERT') {
             await notificationService.sendAlert([recipient], content);
-        }
-
-        // OneSignal: push for all direct chat/alert/sms messages
-        if (recipientId && type !== 'EMAIL') {
-            try {
-                await notifyNewMessage({
-                    recipientId,
-                    senderName: resolvedSenderName,
-                    preview: content.length > 80 ? content.slice(0, 77) + '...' : content,
-                });
-            } catch (e) {
-                console.error('[OneSignal] Failed to push message notification:', e);
-            }
         }
 
         return NextResponse.json({ success: true, message: newMessage });
