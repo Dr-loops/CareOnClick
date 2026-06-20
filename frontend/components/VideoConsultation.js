@@ -76,11 +76,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 const twilioRoom = await Video.connect(token, {
                     name: roomId,
                     audio: true,
-                    video: { 
-                        width: { ideal: 1920 }, 
-                        height: { ideal: 1080 },
-                        frameRate: { ideal: 30, max: 60 }
-                    },
+                    video: true,
                     dominantSpeaker: true,
                     networkQuality: { local: 1, remote: 1 },
                 });
@@ -223,10 +219,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
             // Create new video track
             const newTrack = await Video.createLocalVideoTrack({
-                facingMode: newFacingMode,
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                frameRate: { ideal: 30, max: 60 }
+                facingMode: newFacingMode
             });
 
             // Unpublish old, publish new
@@ -386,13 +379,8 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .video-wrapper.thumbnail video {
                     width: 100% !important;
                     height: 100% !important;
-                    object-fit: cover !important; /* Crop thumbnails to look neat */
+                    object-fit: contain !important; /* Never crop on mobile */
                     background: #000;
-                }
-
-                /* Mirror Local Video Only When Front Camera */
-                .video-wrapper.local.mirror video {
-                    transform: rotateY(180deg);
                 }
 
                 .participant-label {
@@ -483,7 +471,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
             <div className="video-grid">
                 {/* Local User */}
                 <div 
-                    className={`video-wrapper local ${pinnedParticipantId === 'local' ? 'pinned' : 'thumbnail'} ${facingMode === 'user' ? 'mirror' : ''}`}
+                    className={`video-wrapper local ${pinnedParticipantId === 'local' ? 'pinned' : 'thumbnail'}`}
                     onClick={() => setPinnedParticipantId('local')}
                 >
                     <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
