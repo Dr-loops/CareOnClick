@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, ChevronLeft, UserPlus, Camera } from 'lucide-react';
+import { getSocket } from '@/lib/socket';
 
 import { createPortal } from 'react-dom';
 
@@ -30,6 +31,10 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
     const [isCameraSwitching, setIsCameraSwitching] = useState(false);
     const [facingMode, setFacingMode] = useState('user');
     const [pinnedParticipantId, setPinnedParticipantId] = useState('local');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [usersList, setUsersList] = useState([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [error, setError] = useState(null);
 
     const localVideoRef = useRef();
@@ -264,6 +269,41 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
         alert("Room ID copied to clipboard. Share it with participants!");
     };
 
+    // ── Add Participant Modal Handlers ──
+    const openAddParticipantModal = async () => {
+        setShowAddModal(true);
+        if (usersList.length === 0) {
+            setIsLoadingUsers(true);
+            try {
+                const res = await fetch('/api/users');
+                if (res.ok) {
+                    const data = await res.json();
+                    setUsersList(data.filter(u => u.id !== user?.id)); // exclude self
+                }
+            } catch (e) {
+                console.error("Failed to fetch users", e);
+            } finally {
+                setIsLoadingUsers(false);
+            }
+        }
+    };
+
+    const callUser = (targetUser) => {
+        const socket = getSocket();
+        if (socket) {
+            socket.emit('incoming_video_call', {
+                recipientId: targetUser.id,
+                callerName: user?.name || 'A user',
+                callerId: user?.id,
+                roomId: roomId
+            });
+            alert(`Ringing ${targetUser.name}... They will receive a pop-up to join!`);
+            setShowAddModal(false);
+        } else {
+            alert("Socket not connected. Please try again.");
+        }
+    };
+
     // ── Render helper for remote participant video ──
     const RemoteParticipantView = ({ participant, isPinned, onClick }) => {
         const videoRef = useRef();
@@ -454,7 +494,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                     <span className={`w-2 h-2 rounded-full ${callStatus === 'connected' ? 'bg-green-500' : callStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
                     {callStatus === 'connecting' ? 'CONNECTING...' : callStatus === 'connected' ? `TELEHEALTH ROOM` : 'DISCONNECTED'}
                 </div>
-                <button onClick={copyRoomId} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
+                <button onClick={openAddParticipantModal} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
                     <UserPlus className="w-5 h-5" />
                     <span className="hidden sm:inline">Add Participant</span>
                 </button>
@@ -555,6 +595,58 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                     <PhoneOff />
                 </button>
             </div>
+
+            {/* Add Participant Modal */}
+            {showAddModal && (
+                <div className="absolute inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800">
+                            <h3 className="text-white font-semibold">Add Participant</h3>
+                            <button onClick={() => setShowAddModal(false)} className="text-white/50 hover:text-white text-2xl leading-none">&times;</button>
+                        </div>
+                        <div className="p-4 border-b border-white/10 bg-slate-900">
+                            <input 
+                                type="text" 
+                                placeholder="Search by name or role..." 
+                                className="w-full bg-slate-800 text-white border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 placeholder-white/30"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="p-2 overflow-y-auto max-h-96">
+                            {isLoadingUsers ? (
+                                <div className="p-8 text-center text-white/50 animate-pulse">Loading users...</div>
+                            ) : usersList.filter(u => 
+                                u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                u.role.toLowerCase().includes(searchQuery.toLowerCase())
+                            ).length > 0 ? (
+                                usersList.filter(u => 
+                                    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                    u.role.toLowerCase().includes(searchQuery.toLowerCase())
+                                ).map(u => (
+                                    <div key={u.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-xl transition-colors">
+                                        <div>
+                                            <div className="text-white font-medium">{u.name}</div>
+                                            <div className="text-white/50 text-xs uppercase tracking-wider">{u.role}</div>
+                                        </div>
+                                        <button 
+                                            onClick={() => callUser(u)}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-lg"
+                                        >
+                                            Ring
+                                        </button>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="p-8 text-center text-white/50">No users found.</div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-slate-800 border-t border-white/10 text-xs text-white/40 text-center">
+                            Or share link manually: <button onClick={copyRoomId} className="text-blue-400 hover:text-blue-300 ml-1 font-medium cursor-pointer">Copy ID</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 
