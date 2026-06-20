@@ -496,9 +496,6 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 }
                 .video-wrapper.thumbnail:hover { opacity: 1; transform: translateY(-4px); border-color: rgba(59, 130, 246, 0.5); }
                 .video-wrapper.thumbnail video { width: 100% !important; height: 100% !important; object-fit: contain !important; background: #000; }
-                
-                /* Mirror the local video so left is left */
-                .video-wrapper.local video { transform: scaleX(-1); }
 
                 .participant-label {
                     position: absolute;
