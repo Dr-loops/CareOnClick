@@ -365,9 +365,99 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
     if (!mounted) return null;
 
+    // Grouping users
+    const filteredUsers = usersList.filter(u => 
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        u.role.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const professionals = filteredUsers.filter(u => u.role !== 'patient');
+    const patients = filteredUsers.filter(u => u.role === 'patient');
+
+    const renderUserItem = (u) => (
+        <div key={u.id} className="modal-user-item">
+            <div className="user-info">
+                <div className="user-name">{u.name}</div>
+                <div className="user-role">{u.role}</div>
+            </div>
+            <button onClick={() => callUser(u)} className="btn-ring">
+                Ring
+            </button>
+        </div>
+    );
+
     const content = (
-        <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col font-sans overflow-hidden">
+        <div className="video-consultation-container">
             <style jsx>{`
+                .video-consultation-container {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    z-index: 1000;
+                    background-color: #0f172a;
+                    display: flex;
+                    flex-direction: column;
+                    font-family: var(--font-sans), sans-serif;
+                    overflow: hidden;
+                }
+                .video-header {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    padding: 1.5rem;
+                    z-index: 1050;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+                    pointer-events: none;
+                }
+                .header-btn {
+                    pointer-events: auto;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    color: rgba(255,255,255,0.9);
+                    background: rgba(255,255,255,0.1);
+                    padding: 0.5rem 1rem;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-weight: 500;
+                    backdrop-filter: blur(10px);
+                }
+                .header-btn:hover { background: rgba(255,255,255,0.2); color: white; }
+                .header-btn.add-participant {
+                    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+                    border: none;
+                    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+                }
+                .header-btn.add-participant:hover { filter: brightness(1.1); transform: translateY(-2px); }
+                .status-badge {
+                    pointer-events: auto;
+                    background: rgba(37, 99, 235, 0.2);
+                    color: #60a5fa;
+                    padding: 0.5rem 1rem;
+                    border-radius: 12px;
+                    border: 1px solid rgba(59, 130, 246, 0.3);
+                    font-weight: bold;
+                    font-size: 0.875rem;
+                    letter-spacing: 0.05em;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    backdrop-filter: blur(10px);
+                }
+                .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+                .status-dot.connected { background-color: #10b981; }
+                .status-dot.connecting { background-color: #f59e0b; animation: pulse 2s infinite; }
+                .status-dot.ended { background-color: #ef4444; }
+                @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
                 .video-grid {
                     display: flex;
                     flex-wrap: wrap;
@@ -389,40 +479,22 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                     cursor: pointer;
                     transition: all 0.3s ease;
                 }
-                /* Pinned Video Styles */
                 .video-wrapper.pinned {
                     width: 100%;
-                    height: calc(100vh - 300px); /* Fill most of screen */
+                    height: calc(100vh - 300px);
                     min-height: 300px;
-                    order: 1; /* Always first */
+                    order: 1;
                     cursor: default;
                 }
-                .video-wrapper.pinned video {
-                    width: 100% !important;
-                    height: 100% !important;
-                    object-fit: contain !important; /* Prevent zooming */
-                    background: #000;
-                }
-                
-                /* Thumbnail Styles */
+                .video-wrapper.pinned video { width: 100% !important; height: 100% !important; object-fit: contain !important; background: #000; }
                 .video-wrapper.thumbnail {
                     width: 120px;
                     height: 160px;
-                    order: 2; /* Always after pinned */
+                    order: 2;
                     opacity: 0.8;
                 }
-                .video-wrapper.thumbnail:hover {
-                    opacity: 1;
-                    transform: translateY(-4px);
-                    border-color: rgba(59, 130, 246, 0.5);
-                }
-                .video-wrapper.thumbnail video {
-                    width: 100% !important;
-                    height: 100% !important;
-                    object-fit: contain !important; /* Never crop on mobile */
-                    background: #000;
-                }
-
+                .video-wrapper.thumbnail:hover { opacity: 1; transform: translateY(-4px); border-color: rgba(59, 130, 246, 0.5); }
+                .video-wrapper.thumbnail video { width: 100% !important; height: 100% !important; object-fit: contain !important; background: #000; }
                 .participant-label {
                     position: absolute;
                     bottom: 12px;
@@ -472,37 +544,111 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .control-btn.active { background: #ef4444; }
                 
                 @media (max-width: 640px) {
-                    .video-wrapper.pinned {
-                        height: calc(100vh - 280px);
-                    }
-                    .video-wrapper.thumbnail {
-                        width: 90px;
-                        height: 120px;
-                    }
+                    .video-wrapper.pinned { height: calc(100vh - 280px); }
+                    .video-wrapper.thumbnail { width: 90px; height: 120px; }
                     .controls { width: 90%; gap: 10px; padding: 12px; }
                     .control-btn { width: 44px; height: 44px; }
+                    .header-text { display: none; }
                 }
+
+                .modal-overlay {
+                    position: fixed;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    z-index: 1200;
+                    background: rgba(0, 0, 0, 0.75);
+                    backdrop-filter: blur(8px);
+                    display: flex; align-items: center; justify-content: center;
+                    padding: 1rem;
+                    pointer-events: auto;
+                }
+                .modal-content {
+                    background: #1e293b;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 16px;
+                    width: 100%; max-width: 450px;
+                    overflow: hidden;
+                    display: flex; flex-direction: column;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+                }
+                .modal-header {
+                    padding: 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    display: flex; justify-content: space-between; align-items: center;
+                    background: #0f172a;
+                }
+                .modal-header h3 { color: white; font-size: 1.1rem; margin: 0; }
+                .modal-close {
+                    background: none; border: none; color: rgba(255, 255, 255, 0.5);
+                    font-size: 1.5rem; cursor: pointer; transition: color 0.2s; line-height: 1;
+                }
+                .modal-close:hover { color: white; }
+                .modal-search { padding: 1rem; background: #1e293b; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+                .modal-search input {
+                    width: 100%; background: #0f172a; color: white;
+                    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px;
+                    padding: 0.75rem 1rem; font-size: 0.95rem; outline: none;
+                }
+                .modal-search input:focus { border-color: #3b82f6; }
+                .modal-body { padding: 0.5rem; overflow-y: auto; max-height: 400px; background: #1e293b; }
+                .section-title {
+                    color: rgba(255,255,255,0.4); font-size: 0.75rem; text-transform: uppercase;
+                    letter-spacing: 0.05em; padding: 0.5rem 1rem; margin-top: 0.5rem; font-weight: 600;
+                }
+                .modal-user-item {
+                    display: flex; justify-content: space-between; align-items: center;
+                    padding: 0.75rem 1rem; border-radius: 12px; transition: background 0.2s;
+                }
+                .modal-user-item:hover { background: rgba(255, 255, 255, 0.05); }
+                .user-name { color: white; font-weight: 500; margin-bottom: 0.25rem; }
+                .user-role { color: rgba(255, 255, 255, 0.5); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+                .btn-ring {
+                    background: linear-gradient(135deg, #10b981, #2563eb); /* Green to Blue */
+                    color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 8px;
+                    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+                    box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); transition: all 0.2s;
+                }
+                .btn-ring:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4); }
+                .modal-footer {
+                    padding: 1rem; background: #0f172a; border-top: 1px solid rgba(255, 255, 255, 0.1);
+                    text-align: center; font-size: 0.85rem; color: rgba(255, 255, 255, 0.4);
+                }
+                .link-btn { background: none; border: none; color: #3b82f6; font-weight: 500; cursor: pointer; margin-left: 0.25rem; }
+                .link-btn:hover { text-decoration: underline; }
+                .video-error {
+                    position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 1060;
+                    background: rgba(220, 38, 38, 0.2); color: #fca5a5; padding: 0.75rem 1.5rem;
+                    border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.3); backdrop-filter: blur(10px);
+                    font-size: 0.9rem; max-width: 90%; text-align: center;
+                }
+                .center-status {
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    width: 100%; height: 100%; color: rgba(255, 255, 255, 0.4); font-size: 0.85rem; padding: 2rem;
+                }
+                .spinner {
+                    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+                    border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem;
+                }
+                @keyframes spin { to { transform: rotate(360deg); } }
             `}</style>
 
             {/* Header */}
-            <div className="absolute top-0 inset-x-0 p-6 z-[1050] flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-                <button onClick={leaveCall} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
-                    <ChevronLeft className="w-5 h-5" />
-                    <span className="font-medium">Leave Call</span>
+            <div className="video-header">
+                <button onClick={leaveCall} className="header-btn">
+                    <ChevronLeft size={20} />
+                    <span className="header-text">Leave Call</span>
                 </button>
-                <div className="pointer-events-auto bg-blue-600/20 text-blue-400 px-4 py-2 rounded-xl backdrop-blur-md border border-blue-500/20 font-bold text-sm tracking-wide flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${callStatus === 'connected' ? 'bg-green-500' : callStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                <div className="status-badge">
+                    <span className={`status-dot ${callStatus}`} />
                     {callStatus === 'connecting' ? 'CONNECTING...' : callStatus === 'connected' ? `TELEHEALTH ROOM` : 'DISCONNECTED'}
                 </div>
-                <button onClick={openAddParticipantModal} className="pointer-events-auto flex items-center gap-2 text-white/80 hover:text-white bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md transition-all">
-                    <UserPlus className="w-5 h-5" />
-                    <span className="hidden sm:inline">Add Participant</span>
+                <button onClick={openAddParticipantModal} className="header-btn add-participant">
+                    <UserPlus size={20} />
+                    <span className="header-text">Add Participant</span>
                 </button>
             </div>
 
             {/* Error State */}
             {error && (
-                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1060] bg-red-600/20 text-red-300 px-6 py-3 rounded-xl border border-red-500/30 backdrop-blur-md text-sm max-w-md text-center">
+                <div className="video-error">
                     ⚠️ {error}
                 </div>
             )}
@@ -516,8 +662,8 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 >
                     <div ref={localVideoRef} style={{ width: '100%', height: '100%' }} />
                     {isVideoOff && (
-                        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
-                            <VideoOff className="w-16 h-16 text-gray-700" />
+                        <div style={{ position: 'absolute', top:0, left:0, right:0, bottom:0, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <VideoOff size={48} color="#444" />
                         </div>
                     )}
                     <div className="participant-label">You ({user?.name || 'Local'})</div>
@@ -535,24 +681,20 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
                 {/* Empty State */}
                 {remoteParticipants.length === 0 && callStatus === 'connected' && (
-                    <div className="video-wrapper thumbnail flex items-center justify-center border-dashed border-white/10 cursor-default" style={{ opacity: 0.5 }}>
-                        <div className="text-center p-4">
-                            <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2 animate-pulse">
-                                <span className="text-lg">📡</span>
-                            </div>
-                            <p className="text-white/20 text-[10px]">Waiting...</p>
+                    <div className="video-wrapper thumbnail" style={{ opacity: 0.5, borderStyle: 'dashed' }}>
+                        <div className="center-status">
+                            <span style={{ fontSize: '24px', marginBottom: '8px' }}>📡</span>
+                            <span>Waiting...</span>
                         </div>
                     </div>
                 )}
 
                 {/* Connecting State */}
                 {callStatus === 'connecting' && (
-                    <div className="video-wrapper thumbnail flex items-center justify-center cursor-default">
-                        <div className="text-center p-4">
-                            <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-2 animate-spin">
-                                <span className="text-lg">🔄</span>
-                            </div>
-                            <p className="text-white/30 text-[10px]">Connecting...</p>
+                    <div className="video-wrapper thumbnail">
+                        <div className="center-status">
+                            <div className="spinner"></div>
+                            <span>Connecting...</span>
                         </div>
                     </div>
                 )}
@@ -567,7 +709,6 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 >
                     {isMuted ? <MicOff /> : <Mic />}
                 </button>
-
                 <button
                     onClick={toggleVideo}
                     className={`control-btn ${isVideoOff ? 'active' : 'secondary'}`}
@@ -575,18 +716,15 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 >
                     {isVideoOff ? <VideoOff /> : <VideoIcon />}
                 </button>
-
                 <button
                     onClick={toggleCamera}
-                    className={`control-btn secondary ${isCameraSwitching ? 'animate-spin' : ''}`}
+                    className={`control-btn secondary`}
                     disabled={isCameraSwitching}
                     title="Switch Camera"
                 >
                     <Camera />
                 </button>
-
-                <div className="w-px h-8 bg-white/10 mx-2" />
-
+                <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)', margin: '0 8px' }} />
                 <button
                     onClick={leaveCall}
                     className="control-btn danger"
@@ -598,51 +736,44 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
 
             {/* Add Participant Modal */}
             {showAddModal && (
-                <div className="absolute inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
-                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl">
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800">
-                            <h3 className="text-white font-semibold">Add Participant</h3>
-                            <button onClick={() => setShowAddModal(false)} className="text-white/50 hover:text-white text-2xl leading-none">&times;</button>
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>Add Participant</h3>
+                            <button onClick={() => setShowAddModal(false)} className="modal-close">&times;</button>
                         </div>
-                        <div className="p-4 border-b border-white/10 bg-slate-900">
+                        <div className="modal-search">
                             <input 
                                 type="text" 
                                 placeholder="Search by name or role..." 
-                                className="w-full bg-slate-800 text-white border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 placeholder-white/30"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <div className="p-2 overflow-y-auto max-h-96">
+                        <div className="modal-body">
                             {isLoadingUsers ? (
-                                <div className="p-8 text-center text-white/50 animate-pulse">Loading users...</div>
-                            ) : usersList.filter(u => 
-                                u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                u.role.toLowerCase().includes(searchQuery.toLowerCase())
-                            ).length > 0 ? (
-                                usersList.filter(u => 
-                                    u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                    u.role.toLowerCase().includes(searchQuery.toLowerCase())
-                                ).map(u => (
-                                    <div key={u.id} className="flex justify-between items-center p-3 hover:bg-white/5 rounded-xl transition-colors">
-                                        <div>
-                                            <div className="text-white font-medium">{u.name}</div>
-                                            <div className="text-white/50 text-xs uppercase tracking-wider">{u.role}</div>
-                                        </div>
-                                        <button 
-                                            onClick={() => callUser(u)}
-                                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-lg"
-                                        >
-                                            Ring
-                                        </button>
-                                    </div>
-                                ))
+                                <div className="center-status" style={{ padding: '2rem 0' }}>Loading users...</div>
+                            ) : filteredUsers.length > 0 ? (
+                                <>
+                                    {professionals.length > 0 && (
+                                        <>
+                                            <div className="section-title">Professionals</div>
+                                            {professionals.map(renderUserItem)}
+                                        </>
+                                    )}
+                                    {patients.length > 0 && (
+                                        <>
+                                            <div className="section-title">Patients</div>
+                                            {patients.map(renderUserItem)}
+                                        </>
+                                    )}
+                                </>
                             ) : (
-                                <div className="p-8 text-center text-white/50">No users found.</div>
+                                <div className="center-status" style={{ padding: '2rem 0' }}>No users found.</div>
                             )}
                         </div>
-                        <div className="p-4 bg-slate-800 border-t border-white/10 text-xs text-white/40 text-center">
-                            Or share link manually: <button onClick={copyRoomId} className="text-blue-400 hover:text-blue-300 ml-1 font-medium cursor-pointer">Copy ID</button>
+                        <div className="modal-footer">
+                            Or share link manually: <button onClick={copyRoomId} className="link-btn">Copy ID</button>
                         </div>
                     </div>
                 </div>
