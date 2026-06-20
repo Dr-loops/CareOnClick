@@ -462,12 +462,13 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                     display: flex;
                     flex-wrap: wrap;
                     gap: 12px;
-                    padding: 80px 20px 140px;
+                    padding: 80px 12px 100px;
                     width: 100%;
-                    height: 100vh;
+                    height: 100dvh;
                     overflow-y: auto;
                     align-content: flex-start;
                     justify-content: center;
+                    box-sizing: border-box;
                 }
                 .video-wrapper {
                     position: relative;
@@ -481,7 +482,7 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 }
                 .video-wrapper.pinned {
                     width: 100%;
-                    height: calc(100vh - 300px);
+                    height: calc(100dvh - 360px); /* Leave room for padding + thumbnails */
                     min-height: 300px;
                     order: 1;
                     cursor: default;
@@ -495,6 +496,10 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 }
                 .video-wrapper.thumbnail:hover { opacity: 1; transform: translateY(-4px); border-color: rgba(59, 130, 246, 0.5); }
                 .video-wrapper.thumbnail video { width: 100% !important; height: 100% !important; object-fit: contain !important; background: #000; }
+                
+                /* Mirror the local video so left is left */
+                .video-wrapper.local video { transform: scaleX(-1); }
+
                 .participant-label {
                     position: absolute;
                     bottom: 12px;
@@ -544,9 +549,10 @@ const VideoConsultation = ({ roomId, user, onLeave }) => {
                 .control-btn.active { background: #ef4444; }
                 
                 @media (max-width: 640px) {
-                    .video-wrapper.pinned { height: calc(100vh - 280px); }
+                    .video-grid { padding: 80px 8px 90px; }
+                    .video-wrapper.pinned { height: calc(100dvh - 300px); min-height: 250px; }
                     .video-wrapper.thumbnail { width: 90px; height: 120px; }
-                    .controls { width: 90%; gap: 10px; padding: 12px; }
+                    .controls { width: 90%; gap: 10px; padding: 12px; bottom: 20px; }
                     .control-btn { width: 44px; height: 44px; }
                     .header-text { display: none; }
                 }
