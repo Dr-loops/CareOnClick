@@ -2373,14 +2373,12 @@ export default function PatientDashboard({ user }) {
                                                         // Map generic test names or use key
                                                         // This is a basic attempt to find an analysis; complex manual tests might not match exactly
                                                         let analysis = null;
-                                                        if (analyzableCategories) {
-                                                            // Helper to find category
-                                                            for (const cat of ['VITALS', 'FBC', 'LFT', 'RFT']) {
-                                                                const res = analyzeResult(cat, key, val, profile.age || 30, profile.sex || 'Male');
-                                                                if (res) {
-                                                                    analysis = res;
-                                                                    break;
-                                                                }
+                                                        // Helper to find category
+                                                        for (const cat of ['VITALS', 'FBC', 'LFT', 'RFT']) {
+                                                            const res = analyzeResult(cat, key, val, profile.age || 30, profile.sex || 'Male');
+                                                            if (res) {
+                                                                analysis = res;
+                                                                break;
                                                             }
                                                         }
                                                         const flag = meta?.flag || (analysis && analysis.flag !== 'Normal' ? analysis.flag : null);
